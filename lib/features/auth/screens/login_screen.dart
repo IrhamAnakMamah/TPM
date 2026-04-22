@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart'; // IMPORT REGISTER
-import 'forgot_password_screen.dart'; // IMPORT FORGOT PASSWORD
+import '../../../core/services/api_service.dart';
+import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,7 +13,47 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final ApiService _apiService = ApiService();
   bool _isObscure = true;
+  bool _isLoading = false;
+
+  Future<void> _handleLogin() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      _showSnackBar('Username dan password harus diisi', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final result = await _apiService.login(
+      username: username,
+      password: password,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      if (!mounted) return;
+      _showSnackBar('Login berhasil! Selamat datang 👋');
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      _showSnackBar(result['message'] ?? 'Login gagal', isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade600 : Colors.teal.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       TextField(
                         controller: _passwordController,
                         obscureText: _isObscure,
+                        onSubmitted: (_) => _handleLogin(),
                         decoration: InputDecoration(
                           hintText: 'Password', prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(icon: Icon(_isObscure ? Icons.visibility_off : Icons.visibility), onPressed: () => setState(() => _isObscure = !_isObscure)),
@@ -69,9 +111,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(
                         width: double.infinity, height: 55,
                         child: ElevatedButton(
-                          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+                          onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), elevation: 5),
-                          child: const Text('MASUK KE DASHBOARD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24, height: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                )
+                              : const Text('MASUK KE DASHBOARD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
                       ),
                       const SizedBox(height: 20),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/currency_converter.dart';
+import '../../../core/utils/time_converter.dart';
 
 class ConversionScreen extends StatefulWidget {
   final int initialIndex;
@@ -15,11 +17,13 @@ class _ConversionScreenState extends State<ConversionScreen> {
   String _selectedCurrencyFrom = 'IDR';
   String _selectedCurrencyTo = 'USD';
   final List<String> _currencies = ['IDR', 'USD', 'EUR', 'GBP'];
+  String _currencyResultText = 'Estimasi: 0.00';
 
   // --- State Konversi Waktu (Sesuai Syarat Mutlak PPT) ---
   String _selectedTimeFrom = 'WIB';
   String _selectedTimeTo = 'WITA'; 
   final List<String> _timezones = ['WIB', 'WIT', 'WITA', 'London'];
+  String _timeResultText = '';
 
   @override
   Widget build(BuildContext context) {
@@ -101,15 +105,33 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Logic hitung API kurs (Tugas Irham)')),
-                );
+                final amountText = _amountController.text.trim();
+                if (amountText.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Masukkan nominal terlebih dahulu')),
+                  );
+                  return;
+                }
+                
+                final amount = double.tryParse(amountText);
+                if (amount == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nominal harus berupa angka valid')),
+                  );
+                  return;
+                }
+                
+                final result = CurrencyConverter.convert(amount, _selectedCurrencyFrom, _selectedCurrencyTo);
+                
+                setState(() {
+                  _currencyResultText = 'Estimasi: ${CurrencyConverter.formatResult(result, _selectedCurrencyTo)}';
+                });
               },
               child: const Text('Hitung Konversi', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(height: 24),
-          // Mockup Hasil dengan backslash dolar (\$) agar tidak error
+          // Hasil Konversi
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -118,8 +140,9 @@ class _ConversionScreenState extends State<ConversionScreen> {
             ),
             child: Center(
               child: Text(
-                'Estimasi: 0.00 \(\$\)', 
+                _currencyResultText, 
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                textAlign: TextAlign.center,
               ),
             ),
           )
@@ -150,13 +173,23 @@ class _ConversionScreenState extends State<ConversionScreen> {
               _buildDropdown(
                 value: _selectedTimeFrom, 
                 items: _timezones,
-                onChanged: (val) => setState(() => _selectedTimeFrom = val!),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedTimeFrom = val!;
+                    _timeResultText = '';
+                  });
+                },
               ),
               const Icon(Icons.arrow_forward, color: Colors.blue),
               _buildDropdown(
                 value: _selectedTimeTo, 
                 items: _timezones,
-                onChanged: (val) => setState(() => _selectedTimeTo = val!),
+                onChanged: (val) {
+                  setState(() {
+                    _selectedTimeTo = val!;
+                    _timeResultText = '';
+                  });
+                },
               ),
             ],
           ),
@@ -170,13 +203,36 @@ class _ConversionScreenState extends State<ConversionScreen> {
                 foregroundColor: Colors.white,
               ),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Logic selisih jam antar zona (Tugas Irham)')),
-                );
+                final diffText = TimeConverter.describeTimeDifference(_selectedTimeFrom, _selectedTimeTo);
+                setState(() {
+                  _timeResultText = diffText;
+                });
               },
               child: const Text('Cek Selisih Waktu', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
+          const SizedBox(height: 24),
+          if (_timeResultText.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.blue),
+                  const SizedBox(height: 8),
+                  Text(
+                    _timeResultText, 
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blue),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
         ],
       ),
     );

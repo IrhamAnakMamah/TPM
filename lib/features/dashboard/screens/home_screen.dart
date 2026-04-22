@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/session_manager.dart';
 import '../../pharmacy_map/screens/map_screen.dart';
 import '../../scanner_ai/screens/camera_view_screen.dart'; // IMPORT SCANNER DI SINI
 
@@ -7,6 +8,12 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final session = SessionManager();
+    final displayName = session.userName;
+    final initials = displayName.isNotEmpty
+        ? displayName.trim().split(' ').map((w) => w[0]).take(2).join().toUpperCase()
+        : '?';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
@@ -15,16 +22,18 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Halo, Yusuf Nur', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                  Text('Informatika UPN "Veteran" Yogyakarta', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Halo, $displayName', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                    Text(session.userEmail.isNotEmpty ? session.userEmail : 'Informatika UPN "Veteran" Yogyakarta', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                  ],
+                ),
               ),
               Container(
                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.teal.shade100, width: 2)),
-                child: const CircleAvatar(radius: 25, backgroundColor: Colors.teal, child: Text('YN', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                child: CircleAvatar(radius: 25, backgroundColor: Colors.teal, child: Text(initials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
               ),
             ],
           ),

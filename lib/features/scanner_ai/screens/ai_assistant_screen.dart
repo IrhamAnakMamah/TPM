@@ -1,7 +1,78 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/api_service.dart';
+import '../../../core/services/session_manager.dart';
 
-class AIAssistantScreen extends StatelessWidget {
+class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
+
+  @override
+  State<AIAssistantScreen> createState() => _AIAssistantScreenState();
+}
+
+class _AIAssistantScreenState extends State<AIAssistantScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  final ApiService _apiService = ApiService();
+  final SessionManager _session = SessionManager();
+  final ScrollController _scrollController = ScrollController();
+  
+  final List<_ChatMessage> _messages = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pesan pembuka dari AI
+    _messages.add(_ChatMessage(
+      text: "Halo ${_session.userName}! Saya asisten kesehatan AI Anda (PillPal-AI). "
+          "Anda bisa menanyakan dosis obat, efek samping, atau jadwal konsumsi obat. "
+          "Ada yang bisa saya bantu?",
+      isUser: false,
+    ));
+  }
+
+  Future<void> _sendMessage() async {
+    final question = _messageController.text.trim();
+    if (question.isEmpty || _isLoading) return;
+
+    // Tambah pesan user
+    setState(() {
+      _messages.add(_ChatMessage(text: question, isUser: true));
+      _isLoading = true;
+    });
+    _messageController.clear();
+    _scrollToBottom();
+
+    // Kirim ke backend Gemini
+    final result = await _apiService.askGemini(question);
+
+    setState(() {
+      _isLoading = false;
+      if (result['status'] == 'ok') {
+        _messages.add(_ChatMessage(
+          text: result['answer'] ?? 'Tidak ada jawaban.',
+          isUser: false,
+        ));
+      } else {
+        _messages.add(_ChatMessage(
+          text: '⚠️ ${result['message'] ?? 'Terjadi kesalahan saat menghubungi AI.'}',
+          isUser: false,
+        ));
+      }
+    });
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,27 +91,60 @@ class AIAssistantScreen extends StatelessWidget {
                   'Powered by Gemini AI',
                   style: TextStyle(color: Colors.teal.shade700, fontSize: 12, fontWeight: FontWeight.bold),
                 ),
+                const Spacer(),
+                if (_isLoading)
+                  SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.teal.shade700,
+                    ),
+                  ),
               ],
             ),
           ),
           
           Expanded(
-            child: ListView(
+            child: ListView.builder(
+              controller: _scrollController,
               padding: const EdgeInsets.all(20),
-              children: const [
-                _ChatBubble(
-                  text: "Halo Yusuf! Saya asisten kesehatan AI Anda. Anda bisa menanyakan dosis obat, efek samping, atau jadwal konsumsi obat. Ada yang bisa saya bantu?",
-                  isUser: false,
-                ),
-                _ChatBubble(
-                  text: "Apa efek samping dari Paracetamol jika diminum berlebihan?",
-                  isUser: true,
-                ),
-                _ChatBubble(
-                  text: "Penggunaan Paracetamol dosis tinggi secara kronis dapat menyebabkan kerusakan hati (hepatotoksisitas). Pastikan konsumsi tidak melebihi 4 gram per hari ya.",
-                  isUser: false,
-                ),
-              ],
+              itemCount: _messages.length + (_isLoading ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _messages.length && _isLoading) {
+                  // Typing indicator
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 2))
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16, height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal.shade400),
+                          ),
+                          const SizedBox(width: 10),
+                          Text('AI sedang berpikir...', style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                final msg = _messages[index];
+                return _ChatBubble(text: msg.text, isUser: msg.isUser);
+              },
             ),
           ),
 
@@ -63,8 +167,10 @@ class AIAssistantScreen extends StatelessWidget {
                         color: Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(24),
                       ),
-                      child: const TextField(
-                        decoration: InputDecoration(
+                      child: TextField(
+                        controller: _messageController,
+                        onSubmitted: (_) => _sendMessage(),
+                        decoration: const InputDecoration(
                           hintText: 'Tulis pertanyaan...',
                           border: InputBorder.none,
                           hintStyle: TextStyle(fontSize: 14),
@@ -74,11 +180,11 @@ class AIAssistantScreen extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   CircleAvatar(
-                    backgroundColor: Colors.teal,
+                    backgroundColor: _isLoading ? Colors.grey : Colors.teal,
                     radius: 24,
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                      onPressed: () {},
+                      onPressed: _isLoading ? null : _sendMessage,
                     ),
                   ),
                 ],
@@ -89,6 +195,13 @@ class AIAssistantScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Data class sederhana untuk menyimpan pesan chat.
+class _ChatMessage {
+  final String text;
+  final bool isUser;
+  _ChatMessage({required this.text, required this.isUser});
 }
 
 class _ChatBubble extends StatelessWidget {
