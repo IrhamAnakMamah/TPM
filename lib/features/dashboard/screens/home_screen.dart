@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../pharmacy_map/screens/map_screen.dart';
-import '../../scanner_ai/screens/camera_view_screen.dart'; // IMPORT SCANNER DI SINI
+import '../../scanner_ai/screens/camera_view_screen.dart';
+import '../../../data/local/database_helper.dart';
+import '../../medications/widgets/medication_card.dart';
+import '../../medications/screens/medication_list_screen.dart';
+import '../../medications/screens/medication_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -69,7 +73,6 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MapScreen())),
               ),
               const SizedBox(width: 15),
-              // --- TOMBOL SCAN OBAT SEKARANG BUKA KAMERA ---
               _buildQuickAction(
                 context: context, icon: Icons.qr_code_scanner, label: 'Scan Obat', color: Colors.blue,
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraViewScreen())),
@@ -82,12 +85,38 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Jadwal Hari Ini', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              TextButton(onPressed: () {}, child: const Text('Lihat Semua')),
+              TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MedicationListScreen())), 
+                child: const Text('Lihat Semua')
+              ),
             ],
           ),
           const SizedBox(height: 10),
-          _buildProMedCard('Paracetamol 500mg', '08:00 WIB', 'Sesudah Makan', true),
-          _buildProMedCard('Amoxicillin', '13:00 WIB', 'Sebelum Makan', false),
+          
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: DatabaseHelper().getSchedulesWithMed(1),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator(color: Colors.teal));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(20), alignment: Alignment.center,
+                  decoration: BoxDecoration(color: Colors.teal.shade50, borderRadius: BorderRadius.circular(20)),
+                  child: const Text('Tidak ada jadwal obat hari ini 🎉', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+                );
+              }
+
+              final schedules = snapshot.data!.take(3).toList();
+              
+              return Column(
+                children: schedules.map((item) => MedicationCard(
+                  scheduleData: item,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => MedicationDetailScreen(scheduleData: item))),
+                )).toList(),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -109,22 +138,6 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildProMedCard(String name, String time, String note, bool isDone) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: isDone ? Colors.teal.shade100 : Colors.transparent), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))]),
-      child: Row(
-        children: [
-          Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: isDone ? Colors.teal.shade50 : Colors.orange.shade50, borderRadius: BorderRadius.circular(12)), child: Icon(isDone ? Icons.check_circle : Icons.pending_actions, color: isDone ? Colors.teal : Colors.orange)),
-          const SizedBox(width: 15),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text('$time • $note', style: TextStyle(color: Colors.grey.shade600, fontSize: 12))])),
-          if (!isDone) const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        ],
       ),
     );
   }
