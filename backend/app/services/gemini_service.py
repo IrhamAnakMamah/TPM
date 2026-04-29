@@ -21,13 +21,13 @@ def test_connection() -> dict:
 
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
         response = model.generate_content(
             "Jawab dalam satu kalimat singkat: Apa itu PillPal?"
         )
         return {
             "status": "ok",
-            "model": "gemini-2.5-flash",
+            "model": "gemini-3.1-flash-lite-preview",
             "response": response.text,
         }
     except Exception as e:
@@ -49,7 +49,7 @@ def ask_question(question: str) -> dict:
 
     try:
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-3.1-flash-lite-preview")
 
         # System prompt agar Gemini menjawab sebagai asisten kesehatan
         system_prompt = (

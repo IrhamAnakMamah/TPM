@@ -19,4 +19,10 @@ class ApiConfig {
   static const String pingRxnormUrl = '$baseUrl/api/services/ping-rxnorm';
   static const String searchDrugUrl = '$baseUrl/api/services/search-drug';
   static const String askGeminiUrl = '$baseUrl/api/services/ask-gemini';
+
+  // ── Medications Endpoints ─────────────────────
+  /// F-04B: Parsing teks alami jadwal obat via Gemini
+  static const String parseScheduleUrl = '$baseUrl/api/medications/parse-schedule';
+  /// F-07: Rangkuman medis obat (RxNorm + OpenFDA + Gemini)
+  static const String drugSummaryUrl = '$baseUrl/api/medications/drug-summary';
 }

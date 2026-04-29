@@ -197,6 +197,73 @@ class ApiService {
   }
 
   // ════════════════════════════════════════════════
+  // F-04B — PARSE SCHEDULE (LLM Natural Language)
+  // ════════════════════════════════════════════════
+
+  /// Parse teks alami jadwal obat via Gemini AI.
+  ///
+  /// [text] contoh: "Minum Paracetamol 500mg tiap 8 jam, stok 30 tablet"
+  ///
+  /// Return sukses: `{'status':'ok', 'data': {name, dosage, dosage_unit,
+  ///   frequency_type, frequency_value, total_stock, time_intake}}`
+  ///
+  /// Terkait SKPL: F-04B
+  Future<Map<String, dynamic>> parseSchedule(String text) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.parseScheduleUrl),
+        headers: _authHeaders,
+        body: jsonEncode({'text': text}),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return data;
+      return {
+        'status': 'error',
+        'message': data['detail'] ?? 'Gagal mem-parsing jadwal (${response.statusCode})',
+      };
+    } catch (e) {
+      return {'status': 'error', 'message': 'Tidak dapat terhubung ke server: $e'};
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // F-07 — DRUG SUMMARY (RxNorm + OpenFDA + Gemini)
+  // ════════════════════════════════════════════════
+
+  /// Dapatkan rangkuman medis obat yang dipersonalisasi.
+  ///
+  /// [drugName]      : Nama obat, contoh: "Paracetamol"
+  /// [allergyProfile]: Profil alergi user dari SessionManager (boleh kosong)
+  ///
+  /// Return sukses: `{'status':'ok', 'drug_name':..., 'rxcui':...,
+  ///   'summary':'...teks rangkuman...', 'data_source':...}`
+  ///
+  /// Terkait SKPL: F-07
+  Future<Map<String, dynamic>> getDrugSummary({
+    required String drugName,
+    String allergyProfile = '',
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.drugSummaryUrl),
+        headers: _authHeaders,
+        body: jsonEncode({
+          'drug_name': drugName,
+          'allergy_profile': allergyProfile,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) return data;
+      return {
+        'status': 'error',
+        'message': data['detail'] ?? 'Gagal mengambil rangkuman (${response.statusCode})',
+      };
+    } catch (e) {
+      return {'status': 'error', 'message': 'Tidak dapat terhubung ke server: $e'};
+    }
+  }
+
+  // ════════════════════════════════════════════════
   // LOGOUT
   // ════════════════════════════════════════════════
 
