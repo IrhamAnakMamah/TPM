@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/session_manager.dart';
 import '../../pharmacy_map/screens/map_screen.dart';
-import '../../scanner_ai/screens/camera_view_screen.dart'; // IMPORT SCANNER DI SINI
+import 'schedule_choice_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -78,10 +78,10 @@ class HomeScreen extends StatelessWidget {
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const MapScreen())),
               ),
               const SizedBox(width: 15),
-              // --- TOMBOL SCAN OBAT SEKARANG BUKA KAMERA ---
+              // --- TOMBOL TAMBAH JADWAL ---
               _buildQuickAction(
-                context: context, icon: Icons.qr_code_scanner, label: 'Scan Obat', color: Colors.blue,
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const CameraViewScreen())),
+                context: context, icon: Icons.add_alarm, label: 'Tambah Jadwal', color: Colors.blue,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ScheduleChoiceScreen())),
               ),
             ],
           ),

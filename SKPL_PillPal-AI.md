@@ -194,22 +194,7 @@ Sistem mengadopsi arsitektur **Client-Server** yang ringan dan berorientasi pada
   - Stok berkurang tepat sesuai dosis setiap kali pengguna mengkonfirmasi konsumsi.
   - Status jadwal berubah menjadi `expired` secara otomatis saat stok habis.
 
-#### F-06 — Identifikasi Citra AI/ML
 
-- **Deskripsi:** Pengguna dapat memfoto obat untuk mengidentifikasi jenisnya secara otomatis.
-- **Detail Teknis:**
-  - Model: **TensorFlow Lite** yang dijalankan on-device.
-  - Kelas yang didukung: `Tablet`, `Kapsul`, `Sirup`.
-  - Sebelum menjalankan kamera, sensor cahaya (S-02) diperiksa untuk memastikan kondisi pencahayaan memadai.
-  - Hasil klasifikasi mengisi field `drug_type` pada data obat.
-- **Model Training:**
-  - Arsitektur: MobileNetV2 (Transfer Learning / Fine-Tuning)
-  - Dataset: Dataset gambar obat (tablet, kapsul, sirup) — custom atau dari sumber publik
-  - Akurasi target: ≥ 85% pada validation set
-  - Format output: `.tflite` (quantized int8), target ukuran model < 5 MB
-- **Kriteria Penerimaan:**
-  - Klasifikasi menghasilkan output dengan confidence score ≥ 75% untuk diterima otomatis.
-  - Jika confidence < 75%, pengguna diminta memilih secara manual.
 
 #### F-07 — Rangkuman Medis LLM
 
@@ -320,15 +305,13 @@ Sistem mengadopsi arsitektur **Client-Server** yang ringan dan berorientasi pada
 | ID | Sensor | Implementasi |
 |----|--------|--------------|
 | S-01 | **Accelerometer** | Deteksi gerakan shake untuk men-snooze alarm pengingat obat |
-| S-02 | **Light Sensor** | Validasi kecukupan cahaya sebelum memulai klasifikasi citra AI (F-06) |
+
 
 **Detail S-01 (Accelerometer):**
 - Threshold guncangan: akselerasi ≥ 15 m/s² selama ≥ 300ms.
 - Snooze dipicu maksimal 3 kali per sesi alarm; setelah itu notifikasi ditandai sebagai "missed".
 
-**Detail S-02 (Light Sensor):**
-- Batas minimum cahaya: ≥ 50 lux.
-- Jika cahaya tidak mencukupi, tampilkan peringatan: _"Intensitas cahaya kurang. Pindah ke area yang lebih terang."_
+
 
 ### 4.2 Kebutuhan Non-Fungsional (Ketersediaan & Performa)
 
@@ -336,7 +319,7 @@ Sistem mengadopsi arsitektur **Client-Server** yang ringan dan berorientasi pada
 |----|-----------|--------|
 | NF-01 | **Ketersediaan Offline** | Fitur jadwal, stok, log konsumsi, dan notifikasi lokal tetap berfungsi tanpa koneksi internet |
 | NF-02 | **Performa LLM** | Respons dari Gemini API ≤ 5 detik pada koneksi 4G normal |
-| NF-03 | **Performa Klasifikasi** | Inferensi model TFLite on-device ≤ 2 detik |
+
 | NF-04 | **Ukuran Aplikasi** | Target ukuran APK ≤ 50 MB |
 
 ### 4.3 Keamanan Data
@@ -433,7 +416,7 @@ users ──< medications ──< schedules ──< intake_logs
 
 | Komponen | Interaksi |
 |----------|-----------|
-| Kamera | Akuisisi gambar untuk klasifikasi obat (F-06) |
+
 | Sensor Cahaya | Validasi kecukupan cahaya (S-02) |
 | Accelerometer | Deteksi shake untuk snooze alarm (S-01) |
 | Sensor Biometrik | Autentikasi fingerprint/face (F-02) |
@@ -451,7 +434,7 @@ users ──< medications ──< schedules ──< intake_logs
 |----|-------|
 | 1 | Pembuatan API Service dengan FastAPI (endpoint untuk LLM, klasifikasi, data obat) |
 | 2 | Integrasi Gemini API (parsing jadwal natural language & LLM summary) |
-| 3 | Pengembangan & training model ML klasifikasi citra (TensorFlow → TFLite) |
+
 | 4 | Integrasi RxNorm API dan OpenFDA API |
 | 5 | Pengelolaan environment, deployment lokal, dan dokumentasi API |
 
@@ -472,7 +455,7 @@ users ──< medications ──< schedules ──< intake_logs
 |--------|-----------------|
 | **Minggu 1** | Setup proyek, autentikasi (F-01, F-02), manajemen profil (F-03), skema SQLite |
 | **Minggu 2** | Penjadwalan manual & LLM (F-04), pelacakan stok (F-05), notifikasi dasar (F-09) |
-| **Minggu 3** | Klasifikasi citra ML (F-06), rangkuman LLM (F-07), Pharmacy Finder (F-08), sensor (S-01, S-02) |
+| **Minggu 3** | Rangkuman LLM (F-07), Pharmacy Finder (F-08), sensor (S-01) |
 | **Minggu 4** | Analitik (F-10), konversi (F-11), ekspor (F-12), mini game (F-13), testing & polish |
 
 ---
@@ -501,7 +484,7 @@ users ──< medications ──< schedules ──< intake_logs
 | Akurasi model klasifikasi rendah | Sedang | Sedang | Tambahkan threshold confidence; user dapat override manual |
 | RxNorm/OpenFDA tidak mengenali nama obat Indonesia | Tinggi | Sedang | Fallback ke pencarian berdasarkan nama generik; tampilkan pesan "data tidak ditemukan" |
 | Sensor tidak tersedia di perangkat tertentu | Sedang | Rendah | Cek ketersediaan sensor saat startup; nonaktifkan fitur terkait secara graceful |
-| Ukuran model TFLite terlalu besar | Rendah | Sedang | Gunakan model quantized (int8); targetkan ukuran model < 10 MB |
+
 
 ---
 
@@ -512,7 +495,7 @@ users ──< medications ──< schedules ──< intake_logs
 | **Medication Adherence** | Kepatuhan pengguna dalam mengonsumsi obat sesuai jadwal yang telah ditentukan |
 | **LLM Parsing** | Proses ekstraksi informasi terstruktur dari teks alami menggunakan model bahasa besar |
 | **RxCUI** | RxNorm Concept Unique Identifier — kode unik standar untuk identifikasi obat |
-| **TFLite** | TensorFlow Lite — versi ringan TensorFlow untuk inferensi on-device di mobile |
+
 | **On-device Inference** | Proses menjalankan model ML langsung di perangkat tanpa memerlukan koneksi server |
 | **Confidence Score** | Nilai kepercayaan model ML terhadap hasil prediksinya (0–100%) |
 | **Snooze** | Penundaan sementara alarm/notifikasi untuk waktu tertentu |

@@ -6,8 +6,8 @@
 ///   - Device fisik (WiFi) → http://<IP-LAN-PC>:8000
 class ApiConfig {
   // ── Base URL ──────────────────────────────────
-  // Gunakan 10.0.2.2 untuk Android Emulator (proxy ke localhost host)
-  static const String baseUrl = 'http://127.0.0.1:8000';
+  // Gunakan IP WiFi Laptop agar bisa diakses dari HP fisik
+  static const String baseUrl = 'http://192.168.2.183:8000';
 
   // ── Auth Endpoints ────────────────────────────
   static const String registerUrl = '$baseUrl/api/auth/register';
