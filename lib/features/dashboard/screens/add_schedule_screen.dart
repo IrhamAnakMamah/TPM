@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/session_manager.dart';
+import '../../../data/local/database_helper.dart';
 
 class AddScheduleScreen extends StatefulWidget {
   final bool useAi;
@@ -21,6 +23,11 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   final _freqValueController = TextEditingController(text: '1');
 
   bool _isLoadingAI = false;
+  
+  // Instance untuk database dan session
+  final _dbHelper = DatabaseHelper();
+  final _session = SessionManager();
+  bool _isSaving = false;
 
   Future<void> _parseWithAI() async {
     final text = _aiController.text.trim();
@@ -72,20 +79,202 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     }
   }
 
-  void _saveSchedule() {
-    if (_nameController.text.isEmpty) {
+  // ══════════════════════════════════════════════════════════════
+  // VALIDASI FORM
+  // ══════════════════════════════════════════════════════════════
+
+  String? _validateForm() {
+    // Validasi nama obat
+    if (_nameController.text.trim().isEmpty) {
+      return 'Nama obat belum diisi!';
+    }
+    
+    // Validasi dosis
+    if (_dosageController.text.trim().isEmpty) {
+      return 'Dosis obat belum diisi!';
+    }
+    
+    final dosage = int.tryParse(_dosageController.text.trim());
+    if (dosage == null || dosage <= 0) {
+      return 'Dosis harus berupa angka positif!';
+    }
+    
+    // Validasi stok
+    if (_stockController.text.trim().isEmpty) {
+      return 'Stok obat belum diisi!';
+    }
+    
+    final stock = int.tryParse(_stockController.text.trim());
+    if (stock == null || stock < 0) {
+      return 'Stok harus berupa angka (minimal 0)!';
+    }
+    
+    // Validasi jam
+    if (_timeController.text.trim().isEmpty) {
+      return 'Jam pertama minum belum diisi!';
+    }
+    
+    // Validasi format jam (HH:mm)
+    final timePattern = RegExp(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$');
+    if (!timePattern.hasMatch(_timeController.text.trim())) {
+      return 'Format jam tidak valid! Gunakan format HH:mm (contoh: 08:00)';
+    }
+    
+    // Validasi frequency value untuk every_n_hours
+    if (_frequencyType == 'every_n_hours') {
+      final freqValue = int.tryParse(_freqValueController.text.trim());
+      if (freqValue == null || freqValue <= 0 || freqValue > 24) {
+        return 'Jarak minum harus antara 1-24 jam!';
+      }
+    }
+    
+    return null; // Semua validasi lolos
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SIMPAN JADWAL KE DATABASE
+  // ══════════════════════════════════════════════════════════════
+
+  Future<void> _saveSchedule() async {
+    // ─────────────────────────────────────────────────────────────
+    // 1. VALIDASI FORM
+    // ─────────────────────────────────────────────────────────────
+    final errorMessage = _validateForm();
+    if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama obat belum diisi!'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
       );
       return;
     }
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Jadwal Berhasil Disimpan (Masih Simulasi)'), backgroundColor: Colors.green),
-    );
-    // Kembali dua kali ke layar Home
-    Navigator.of(context).pop();
-    Navigator.of(context).pop();
+    // ─────────────────────────────────────────────────────────────
+    // 2. AMBIL USER ID DARI SESSION
+    // ─────────────────────────────────────────────────────────────
+    final userId = _session.currentUser?['id'];
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Sesi login tidak valid. Silakan login ulang.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    // ─────────────────────────────────────────────────────────────
+    // 3. SET LOADING STATE
+    // ─────────────────────────────────────────────────────────────
+    setState(() => _isSaving = true);
+    
+    try {
+      // ─────────────────────────────────────────────────────────────
+      // 4. SIAPKAN DATA MEDICATION
+      // ─────────────────────────────────────────────────────────────
+      final now = DateTime.now().toIso8601String();
+      
+      final medicationData = {
+        'user_id': userId,
+        'name': _nameController.text.trim(),
+        'dosage': int.parse(_dosageController.text.trim()),
+        'dosage_unit': _dosageUnit,
+        'drug_type': 'prescription', // Default, bisa disesuaikan
+        'total_stock': int.parse(_stockController.text.trim()),
+        'description': null, // Bisa ditambahkan field di form nanti
+        'rx_cui': null, // Bisa diisi dari API RxNorm nanti
+        'created_at': now,
+        'updated_at': now,
+      };
+      
+      // ─────────────────────────────────────────────────────────────
+      // 5. INSERT KE TABEL MEDICATIONS
+      // ─────────────────────────────────────────────────────────────
+      final medicationId = await _dbHelper.insertMedication(medicationData);
+      
+      if (medicationId == null || medicationId <= 0) {
+        throw Exception('Gagal menyimpan data obat ke database');
+      }
+      
+      // ─────────────────────────────────────────────────────────────
+      // 6. SIAPKAN DATA SCHEDULE
+      // ─────────────────────────────────────────────────────────────
+      final scheduleData = {
+        'medication_id': medicationId,
+        'frequency_type': _frequencyType,
+        'frequency_value': _frequencyType == 'every_n_hours' 
+            ? int.parse(_freqValueController.text.trim()) 
+            : null,
+        'time_intake': _timeController.text.trim(),
+        'notes': null, // Bisa ditambahkan field notes di form nanti
+        'is_active': 1, // Aktif by default
+        'created_at': now,
+      };
+      
+      // ─────────────────────────────────────────────────────────────
+      // 7. INSERT KE TABEL SCHEDULES
+      // ─────────────────────────────────────────────────────────────
+      final scheduleId = await _dbHelper.insertSchedule(scheduleData);
+      
+      if (scheduleId == null || scheduleId <= 0) {
+        throw Exception('Gagal menyimpan jadwal ke database');
+      }
+      
+      // ─────────────────────────────────────────────────────────────
+      // 8. TAMPILKAN SUCCESS MESSAGE
+      // ─────────────────────────────────────────────────────────────
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '✅ Jadwal ${_nameController.text} berhasil disimpan!',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF0D9488), // Teal
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        
+        // ─────────────────────────────────────────────────────────────
+        // 9. KEMBALI KE HOME SCREEN
+        // ─────────────────────────────────────────────────────────────
+        // Pop 2x: keluar dari AddScheduleScreen dan ScheduleChoiceScreen
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
+      }
+      
+    } catch (e) {
+      // ─────────────────────────────────────────────────────────────
+      // 10. HANDLE ERROR
+      // ─────────────────────────────────────────────────────────────
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Gagal menyimpan jadwal: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } finally {
+      // ─────────────────────────────────────────────────────────────
+      // 11. RESET LOADING STATE
+      // ─────────────────────────────────────────────────────────────
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   Widget _buildLabel(String text) {
@@ -276,9 +465,31 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             SizedBox(
               width: double.infinity, height: 60,
               child: ElevatedButton(
-                onPressed: _saveSchedule,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
-                child: const Text('SIMPAN JADWAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+                onPressed: _isSaving ? null : _saveSchedule,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : const Text(
+                        'SIMPAN JADWAL',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          letterSpacing: 1,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(height: 40),
