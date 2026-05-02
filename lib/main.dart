@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 // Import tema kustom agar UI terlihat premium
 import 'core/constants/app_theme.dart';
 // Import semua screen utama
+import 'features/auth/screens/auth_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/dashboard/screens/main_screen.dart';
 
@@ -25,11 +26,14 @@ class TugasAkhirApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       
       // SISTEM NAVIGASI (ROUTES)
-      // initialRoute '/' akan membuka LoginScreen pertama kali
+      // initialRoute '/' akan membuka AuthScreen pertama kali (Login/Register gabungan)
       initialRoute: '/',
       routes: {
-        // Halaman Login
-        '/': (context) => const LoginScreen(),
+        // Halaman Auth (Login/Register dalam satu screen)
+        '/': (context) => const AuthScreen(),
+        
+        // Halaman Login lama (masih bisa diakses jika diperlukan)
+        '/login': (context) => const LoginScreen(),
         
         // Halaman Dashboard Utama (Gunakan MainScreen tanpa const karena ada Timer)
         '/home': (context) => MainScreen(),
@@ -38,7 +42,7 @@ class TugasAkhirApp extends StatelessWidget {
       // Fallback jika terjadi kesalahan navigasi
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
+          builder: (context) => const AuthScreen(),
         );
       },
     );
