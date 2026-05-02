@@ -187,6 +187,42 @@ class DatabaseHelper {
   // CRUD MEDICATIONS
   // ════════════════════════════════════════════════
 
+  /// Pastikan user ada di database lokal (untuk foreign key constraint)
+  Future<void> ensureUserExists({
+    required int userId,
+    required String username,
+    required String email,
+    required String fullName,
+  }) async {
+    final db = await database;
+    
+    // Cek apakah user sudah ada
+    final existing = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    
+    if (existing.isEmpty) {
+      // Insert user baru
+      await db.insert(
+        'users',
+        {
+          'id': userId,
+          'username': username,
+          'email': email,
+          'full_name': fullName,
+          'allergy_profile': '',
+          'biometric_enabled': 0,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      print('✅ User $userId inserted to local database');
+    } else {
+      print('✅ User $userId already exists in local database');
+    }
+  }
+
   /// Tambah obat baru (dengan user_id dari session)
   Future<int> insertMedication({
     required int userId,
