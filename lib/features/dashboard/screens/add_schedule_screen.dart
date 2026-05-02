@@ -89,14 +89,12 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       return 'Nama obat belum diisi!';
     }
     
-    // Validasi dosis
-    if (_dosageController.text.trim().isEmpty) {
-      return 'Dosis obat belum diisi!';
-    }
-    
-    final dosage = int.tryParse(_dosageController.text.trim());
-    if (dosage == null || dosage <= 0) {
-      return 'Dosis harus berupa angka positif!';
+    // Validasi dosis (OPSIONAL - hanya validasi jika diisi)
+    if (_dosageController.text.trim().isNotEmpty) {
+      final dosage = int.tryParse(_dosageController.text.trim());
+      if (dosage == null || dosage <= 0) {
+        return 'Dosis harus berupa angka positif!';
+      }
     }
     
     // Validasi stok
@@ -166,64 +164,63 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     }
     
     // ─────────────────────────────────────────────────────────────
-    // 3. SET LOADING STATE
+    // 3. PASTIKAN USER ADA DI DATABASE LOKAL
+    // ─────────────────────────────────────────────────────────────
+    await _dbHelper.ensureUserExists(
+      userId: userId,
+      username: _session.username,
+      email: _session.userEmail,
+      fullName: _session.userName,
+    );
+    
+    // ─────────────────────────────────────────────────────────────
+    // 4. SET LOADING STATE
     // ─────────────────────────────────────────────────────────────
     setState(() => _isSaving = true);
     
     try {
       // ─────────────────────────────────────────────────────────────
-      // 4. SIAPKAN DATA MEDICATION
-      // ─────────────────────────────────────────────────────────────
-      final now = DateTime.now().toIso8601String();
-      
-      final medicationData = {
-        'user_id': userId,
-        'name': _nameController.text.trim(),
-        'dosage': int.parse(_dosageController.text.trim()),
-        'dosage_unit': _dosageUnit,
-        'drug_type': 'prescription', // Default, bisa disesuaikan
-        'total_stock': int.parse(_stockController.text.trim()),
-        'description': null, // Bisa ditambahkan field di form nanti
-        'rx_cui': null, // Bisa diisi dari API RxNorm nanti
-        'created_at': now,
-        'updated_at': now,
-      };
-      
-      // ─────────────────────────────────────────────────────────────
       // 5. INSERT KE TABEL MEDICATIONS
       // ─────────────────────────────────────────────────────────────
-      final medicationId = await _dbHelper.insertMedication(medicationData);
+      final medicationId = await _dbHelper.insertMedication(
+        userId: userId,
+        name: _nameController.text.trim(),
+        drugType: 'prescription', // Default
+        totalStock: double.parse(_stockController.text.trim()),
+        description: null,
+        rxCui: null,
+      );
       
-      if (medicationId == null || medicationId <= 0) {
+      if (medicationId <= 0) {
         throw Exception('Gagal menyimpan data obat ke database');
       }
       
       // ─────────────────────────────────────────────────────────────
-      // 6. SIAPKAN DATA SCHEDULE
+      // 6. INSERT KE TABEL SCHEDULES
       // ─────────────────────────────────────────────────────────────
-      final scheduleData = {
-        'medication_id': medicationId,
-        'frequency_type': _frequencyType,
-        'frequency_value': _frequencyType == 'every_n_hours' 
+      // Parse dosis (default 1 jika kosong)
+      final dosage = _dosageController.text.trim().isEmpty 
+          ? 1.0 
+          : double.parse(_dosageController.text.trim());
+      
+      final scheduleId = await _dbHelper.insertSchedule(
+        medId: medicationId,
+        timeIntake: _timeController.text.trim(),
+        dosage: dosage,
+        dosageUnit: _dosageUnit,
+        frequencyType: _frequencyType,
+        frequencyValue: _frequencyType == 'every_n_hours' 
             ? int.parse(_freqValueController.text.trim()) 
-            : null,
-        'time_intake': _timeController.text.trim(),
-        'notes': null, // Bisa ditambahkan field notes di form nanti
-        'is_active': 1, // Aktif by default
-        'created_at': now,
-      };
+            : 1, // Default 1 untuk daily
+        notes: null,
+      );
       
-      // ─────────────────────────────────────────────────────────────
-      // 7. INSERT KE TABEL SCHEDULES
-      // ─────────────────────────────────────────────────────────────
-      final scheduleId = await _dbHelper.insertSchedule(scheduleData);
-      
-      if (scheduleId == null || scheduleId <= 0) {
+      if (scheduleId <= 0) {
         throw Exception('Gagal menyimpan jadwal ke database');
       }
       
       // ─────────────────────────────────────────────────────────────
-      // 8. TAMPILKAN SUCCESS MESSAGE
+      // 7. TAMPILKAN SUCCESS MESSAGE
       // ─────────────────────────────────────────────────────────────
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -247,7 +244,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
         );
         
         // ─────────────────────────────────────────────────────────────
-        // 9. KEMBALI KE HOME SCREEN
+        // 8. KEMBALI KE HOME SCREEN
         // ─────────────────────────────────────────────────────────────
         // Pop 2x: keluar dari AddScheduleScreen dan ScheduleChoiceScreen
         Navigator.of(context).pop();
@@ -256,7 +253,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       
     } catch (e) {
       // ─────────────────────────────────────────────────────────────
-      // 10. HANDLE ERROR
+      // 9. HANDLE ERROR
       // ─────────────────────────────────────────────────────────────
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -269,7 +266,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       }
     } finally {
       // ─────────────────────────────────────────────────────────────
-      // 11. RESET LOADING STATE
+      // 10. RESET LOADING STATE
       // ─────────────────────────────────────────────────────────────
       if (mounted) {
         setState(() => _isSaving = false);
@@ -436,15 +433,49 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             ],
 
             _buildLabel('Jam Pertama Minum Hari Ini'),
-            TextField(
-              controller: _timeController,
-              style: const TextStyle(fontSize: 18),
-              decoration: InputDecoration(
-                hintText: 'Contoh: 08:00',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
-                prefixIcon: const Icon(Icons.access_time),
+            GestureDetector(
+              onTap: () async {
+                final TimeOfDay? picked = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.now(),
+                  builder: (BuildContext context, Widget? child) {
+                    return Theme(
+                      data: ThemeData.light().copyWith(
+                        colorScheme: const ColorScheme.light(
+                          primary: Color(0xFF0D9488), // Teal
+                          onPrimary: Colors.white,
+                          surface: Colors.white,
+                          onSurface: Color(0xFF1E293B),
+                        ),
+                        dialogBackgroundColor: Colors.white,
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                
+                if (picked != null) {
+                  // Format jam ke HH:mm (24 jam)
+                  final hour = picked.hour.toString().padLeft(2, '0');
+                  final minute = picked.minute.toString().padLeft(2, '0');
+                  setState(() {
+                    _timeController.text = '$hour:$minute';
+                  });
+                }
+              },
+              child: AbsorbPointer(
+                child: TextField(
+                  controller: _timeController,
+                  style: const TextStyle(fontSize: 18),
+                  decoration: InputDecoration(
+                    hintText: 'Ketuk untuk pilih jam',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
+                    prefixIcon: const Icon(Icons.access_time),
+                    suffixIcon: const Icon(Icons.arrow_drop_down),
+                  ),
+                ),
               ),
             ),
 
