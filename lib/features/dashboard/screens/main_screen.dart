@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/app_strings.dart';
+import '../../../core/services/api_service.dart';
 import '../../profile/screens/profile_screen.dart';
 import 'home_screen.dart';
 import '../../utilities/screens/tools_menu_screen.dart';
@@ -74,7 +75,10 @@ class _MainScreenState extends State<MainScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.logout), 
-            onPressed: () => Navigator.pushReplacementNamed(context, '/')
+            onPressed: () {
+              ApiService().logout();
+              Navigator.pushReplacementNamed(context, '/');
+            }
           ),
         ],
       ),

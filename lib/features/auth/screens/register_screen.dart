@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -8,7 +9,70 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final ApiService _apiService = ApiService();
   bool _isObscure = true;
+  bool _isLoading = false;
+
+  Future<void> _handleRegister() async {
+    final fullName = _fullNameController.text.trim();
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (fullName.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
+      _showSnackBar('Semua field harus diisi', isError: true);
+      return;
+    }
+
+    if (username.length < 3) {
+      _showSnackBar('Username minimal 3 karakter', isError: true);
+      return;
+    }
+
+    if (password.length < 6) {
+      _showSnackBar('Password minimal 6 karakter', isError: true);
+      return;
+    }
+
+    if (!email.contains('@')) {
+      _showSnackBar('Email tidak valid', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final result = await _apiService.register(
+      username: username,
+      email: email,
+      password: password,
+      fullName: fullName,
+    );
+
+    setState(() => _isLoading = false);
+
+    if (result['success'] == true) {
+      if (!mounted) return;
+      _showSnackBar(result['message'] ?? 'Registrasi berhasil! Silakan login.');
+      Navigator.pop(context); // Kembali ke Login
+    } else {
+      _showSnackBar(result['message'] ?? 'Registrasi gagal', isError: true);
+    }
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade600 : Colors.teal.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,19 +98,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       const Text('Lengkapi data diri Anda di bawah ini', style: TextStyle(color: Colors.grey, fontSize: 13)),
                       const SizedBox(height: 30),
                       
-                      _buildTextField(Icons.person_outline, 'Nama Lengkap'),
+                      _buildTextField(_fullNameController, Icons.person_outline, 'Nama Lengkap'),
                       const SizedBox(height: 15),
-                      _buildTextField(Icons.alternate_email, 'Email Address'),
+                      _buildTextField(_usernameController, Icons.account_circle_outlined, 'Username'),
                       const SizedBox(height: 15),
-                      _buildTextField(Icons.lock_outline, 'Password', isPassword: true),
+                      _buildTextField(_emailController, Icons.alternate_email, 'Email Address'),
+                      const SizedBox(height: 15),
+                      _buildTextField(_passwordController, Icons.lock_outline, 'Password', isPassword: true),
                       const SizedBox(height: 30),
 
                       SizedBox(
                         width: double.infinity, height: 55,
                         child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context), // Kembali ke Login setelah daftar
+                          onPressed: _isLoading ? null : _handleRegister,
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.teal.shade700, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                          child: const Text('BUAT AKUN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24, height: 24,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                )
+                              : const Text('BUAT AKUN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -72,8 +143,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _buildTextField(IconData icon, String hint, {bool isPassword = false}) {
+  Widget _buildTextField(TextEditingController controller, IconData icon, String hint, {bool isPassword = false}) {
     return TextField(
+      controller: controller,
       obscureText: isPassword ? _isObscure : false,
       decoration: InputDecoration(
         hintText: hint,

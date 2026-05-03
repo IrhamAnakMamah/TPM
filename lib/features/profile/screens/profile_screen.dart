@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/session_manager.dart';
+import '../../../core/services/api_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -8,10 +10,25 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Data lokal yang bisa diedit
-  String _userName = 'Yusuf Nur Ramadhan';
-  String _userEmail = '123230188@student.upnyk.ac.id';
+  final SessionManager _session = SessionManager();
+  final ApiService _apiService = ApiService();
   bool _isNotificationEnabled = true;
+
+  // Data dari session (live dari backend)
+  String get _userName => _session.userName;
+  String get _userEmail => _session.userEmail;
+  String get _username => _session.username;
+
+  String get _initials {
+    if (_userName.isNotEmpty) {
+      final parts = _userName.trim().split(' ');
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return parts[0][0].toUpperCase();
+    }
+    return '?';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,10 +53,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Stack(
                     alignment: Alignment.bottomRight,
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 55,
-                        backgroundColor: Color(0xFF0D9488),
-                        child: Text('YN', style: TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold)),
+                        backgroundColor: const Color(0xFF0D9488),
+                        child: Text(_initials, style: const TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold)),
                       ),
                       GestureDetector(
                         onTap: () => _showSnackBar('Membuka Galeri Foto...'),
@@ -53,7 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 15),
                   Text(_userName, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
-                  const Text('123230188 | Informatika', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                  Text('@$_username', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                   const SizedBox(height: 20),
                   
                   // FITUR AKTIF: EDIT PROFIL
@@ -81,9 +98,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Informasi Akademik', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const Text('Informasi Akun', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 10),
-                  _buildInfoTile(Icons.school, 'Universitas Pembangunan Nasional'),
+                  _buildInfoTile(Icons.person, 'Username: @$_username'),
                   _buildInfoTile(Icons.email, _userEmail),
                   
                   const SizedBox(height: 25),
@@ -133,7 +150,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () {
-              setState(() => _userName = nameCtrl.text);
+              // Update di session secara lokal (backend belum ada endpoint update profile)
+              final currentUser = _session.currentUser ?? {};
+              currentUser['full_name'] = nameCtrl.text;
+              _session.setUser(currentUser);
+              setState(() {});
               Navigator.pop(context);
               _showSnackBar('Profil diperbarui!');
             },
@@ -198,7 +219,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         content: const Text('Anda akan diarahkan kembali ke halaman login.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pushReplacementNamed(context, '/'), child: const Text('Keluar', style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () {
+              _apiService.logout(); // Bersihkan sesi
+              Navigator.pushReplacementNamed(context, '/');
+            },
+            child: const Text('Keluar', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
@@ -211,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-      child: Row(children: [Icon(icon, color: Colors.teal, size: 20), const SizedBox(width: 15), Text(text)]),
+      child: Row(children: [Icon(icon, color: Colors.teal, size: 20), const SizedBox(width: 15), Expanded(child: Text(text))]),
     );
   }
 
