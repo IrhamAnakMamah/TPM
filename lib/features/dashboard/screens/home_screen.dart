@@ -369,24 +369,26 @@ class _HomeScreenState extends State<HomeScreen> {
                         color: Colors.grey.shade600,
                         fontSize: 12,
                       ),
-                ),
-                if (isLowStock) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '⚠️ Stok tinggal ${totalStock.toInt()}',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    if (isLowStock) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '⚠️ Stok tinggal ${totalStock.toInt()}',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!isDone)
+                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            ],
           ),
-          if (!isDone)
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        ],
+        ),
       ),
     );
   }
