@@ -18,7 +18,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   final _stockController = TextEditingController();
   final _timeController = TextEditingController();
 
-  String _dosageUnit = 'mg';
+  String _dosageUnit = 'tablet';
   String _frequencyType = 'daily';
   final _freqValueController = TextEditingController(text: '1');
 

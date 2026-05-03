@@ -18,7 +18,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   final _stockCtrl = TextEditingController();
   final _freqValCtrl = TextEditingController();
   
-  String _dosageUnit = 'mg';
+  String _dosageUnit = 'tablet';
   String _freqType = 'daily';
   TimeOfDay _selectedTime = TimeOfDay.now();
 
