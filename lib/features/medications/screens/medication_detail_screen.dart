@@ -22,6 +22,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   List<Map<String, dynamic>> _todayLogs = [];
   bool _isLoading = true;
   bool _isConfirming = false;
+  bool _alreadyTakenToday = false;
   
   @override
   void initState() {
@@ -56,14 +57,22 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
       // Load today's intake logs
       final logs = await _dbHelper.getTodayIntakeLogs(widget.scheduleId);
       
+      // Check if already taken today (for 1x daily schedule)
+      final frequencyType = schedule['frequency_type'] as String;
+      final frequencyValue = schedule['frequency_value'] as int;
+      final isDailyOnce = frequencyType == 'daily' && frequencyValue == 1;
+      final alreadyTaken = isDailyOnce && logs.isNotEmpty;
+      
       setState(() {
         _schedule = schedule;
         _todayLogs = logs;
+        _alreadyTakenToday = alreadyTaken;
         _isLoading = false;
       });
       
       print('✅ Loaded schedule: ${schedule['med_name']}');
       print('✅ Today logs: ${logs.length}');
+      print('✅ Already taken today: $alreadyTaken');
     } catch (e) {
       print('❌ Error loading data: $e');
       setState(() => _isLoading = false);
@@ -119,6 +128,8 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
       final medId = _schedule!['med_id'] as int;
       final dosage = _schedule!['dosage'] as double;
       final totalStock = _schedule!['total_stock'] as double;
+      
+      print('🔍 DEBUG: medId=$medId, dosage=$dosage, totalStock=$totalStock');
       
       // Confirm medication taken
       final result = await _dbHelper.confirmMedicationTaken(
@@ -345,14 +356,18 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
   // ══════════════════════════════════════════════════════════════
   
   Widget _buildConfirmButton() {
+    final isDisabled = _alreadyTakenToday || _isConfirming;
+    
     return SizedBox(
       width: double.infinity,
       height: 55,
       child: ElevatedButton(
-        onPressed: _isConfirming ? null : _confirmTaken,
+        onPressed: isDisabled ? null : _confirmTaken,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF0D9488),
           foregroundColor: Colors.white,
+          disabledBackgroundColor: Colors.grey.shade300,
+          disabledForegroundColor: Colors.grey.shade600,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
@@ -367,14 +382,14 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
                   strokeWidth: 3,
                 ),
               )
-            : const Row(
+            : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle, size: 20),
-                  SizedBox(width: 10),
+                  Icon(_alreadyTakenToday ? Icons.check_circle : Icons.check_circle, size: 20),
+                  const SizedBox(width: 10),
                   Text(
-                    'SUDAH MINUM',
-                    style: TextStyle(
+                    _alreadyTakenToday ? 'SUDAH DIMINUM HARI INI' : 'SUDAH MINUM',
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
