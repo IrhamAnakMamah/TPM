@@ -451,6 +451,39 @@ class DatabaseHelper {
     );
   }
 
+  /// Ambil detail schedule berdasarkan ID (dengan info medication)
+  Future<Map<String, dynamic>?> getScheduleById(int scheduleId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT 
+        s.*,
+        m.name as med_name,
+        m.total_stock,
+        m.drug_type,
+        m.user_id
+      FROM schedules s
+      JOIN medications m ON s.med_id = m.id
+      WHERE s.id = ?
+    ''', [scheduleId]);
+    
+    if (result.isEmpty) return null;
+    return result.first;
+  }
+
+  /// Ambil riwayat konsumsi hari ini untuk schedule tertentu
+  Future<List<Map<String, dynamic>>> getTodayIntakeLogs(int scheduleId) async {
+    final db = await database;
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day).toIso8601String();
+    
+    return await db.query(
+      'intake_logs',
+      where: 'schedule_id = ? AND timestamp >= ?',
+      whereArgs: [scheduleId, startOfDay],
+      orderBy: 'timestamp DESC',
+    );
+  }
+
   /// Update schedule yang sudah ada
   Future<int> updateSchedule({
     required int scheduleId,
