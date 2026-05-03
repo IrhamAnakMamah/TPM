@@ -30,7 +30,7 @@ class TugasAkhirApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         // Halaman Auth (Login/Register dalam satu screen)
-        '/': (context) => const AuthScreen(),
+        '/': (context) => const MainScreen(),
         
         // Halaman Login lama (masih bisa diakses jika diperlukan)
         '/login': (context) => const LoginScreen(),

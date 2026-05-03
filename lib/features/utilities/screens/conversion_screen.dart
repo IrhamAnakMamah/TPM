@@ -32,7 +32,7 @@ class _ConversionScreenState extends State<ConversionScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Kalkulator & Konversi'),
+          title: const Text('Waktu & Mata Uang'),
           bottom: const TabBar(
             labelColor: Colors.teal,
             unselectedLabelColor: Colors.grey,
