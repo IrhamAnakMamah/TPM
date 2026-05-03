@@ -233,6 +233,9 @@ class DatabaseHelper {
     String? rxCui,
   }) async {
     final db = await database;
+    
+    print('📝 INSERT MEDICATION: userId=$userId, name=$name, totalStock=$totalStock');
+    
     return await db.insert('medications', {
       'user_id': userId,
       'name': name,
@@ -347,6 +350,9 @@ class DatabaseHelper {
     String? notes,
   }) async {
     final db = await database;
+    
+    print('📝 INSERT SCHEDULE: medId=$medId, dosage=$dosage, dosageUnit=$dosageUnit');
+    
     return await db.insert('schedules', {
       'med_id': medId,
       'time_intake': timeIntake,
