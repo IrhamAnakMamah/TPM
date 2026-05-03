@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../core/services/notification_service.dart';
 
 /// Helper database SQLite lokal untuk menyimpan data obat & jadwal.
 ///
@@ -635,26 +636,26 @@ class DatabaseHelper {
         
         print('✅ Intake log created');
         
-        // 4. Jika stok habis, hapus medication dan semua schedules terkait
+        // 4. Jika stok habis atau kurang, set schedule jadi expired (JANGAN DELETE MEDICATION)
         if (newStock <= 0) {
-          print('⚠️ Stock is 0 or less, deleting medication...');
+          print('⚠️ Stock is 0 or less ($newStock), setting schedules to expired...');
           
-          // Set semua schedules jadi expired
-          await txn.update(
+          // Set semua schedules untuk medication ini jadi expired
+          final updatedSchedules = await txn.update(
             'schedules',
             {'status': 'expired'},
             where: 'med_id = ?',
             whereArgs: [medId],
           );
           
-          // Hapus medication
-          await txn.delete(
-            'medications',
-            where: 'id = ?',
-            whereArgs: [medId],
-          );
+          print('✅ $updatedSchedules schedule(s) set to expired (medication NOT deleted)');
           
-          print('🗑️ Medication deleted (stock = 0): $medId');
+          // TODO: Show low stock notification
+          // await NotificationService().showLowStockNotification(
+          //   medicationName: medName,
+          //   remainingStock: 0,
+          //   dosageUnit: dosageUnit,
+          // );
         } else {
           print('✅ Stock still available: $newStock');
         }
@@ -665,6 +666,7 @@ class DatabaseHelper {
         'message': 'Konsumsi obat berhasil dicatat',
       };
     } catch (e) {
+      print('❌ Error in confirmMedicationTaken: $e');
       return {
         'success': false,
         'message': 'Gagal mencatat konsumsi: $e',

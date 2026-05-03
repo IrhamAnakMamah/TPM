@@ -662,7 +662,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
               ),
             ),
 
-            _buildLabel('Dosis & Satuan'),
+            _buildLabel('Jumlah Sekali Minum'),
             Row(
               children: [
                 Expanded(
@@ -675,7 +675,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
-                      hintText: 'Contoh: 500',
+                      hintText: 'Contoh: 1 atau 2',
+                      helperText: 'Berapa banyak diminum sekali?',
+                      helperStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ),
                 ),
@@ -691,7 +693,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
-                    items: ['mg', 'ml', 'tablet', 'kapsul'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    items: ['tablet', 'kapsul', 'sendok', 'tetes'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                     onChanged: (val) => setState(() => _dosageUnit = val!),
                   ),
                 ),

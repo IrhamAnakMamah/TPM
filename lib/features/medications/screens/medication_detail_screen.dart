@@ -140,13 +140,16 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
       
       if (mounted) {
         if (result['success']) {
-          // Check if stock is now 0
-          if (totalStock - dosage <= 0) {
-            // Stock habis, medication dihapus
+          final newStock = totalStock - dosage;
+          
+          // Check if stock is now 0 or less
+          if (newStock <= 0) {
+            // Stock habis, schedule expired (medication TIDAK dihapus)
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✓ ${_schedule!['med_name']} sudah diminum. Stok habis, jadwal dihapus.'),
+                content: Text('✓ ${_schedule!['med_name']} sudah diminum. Stok habis, jadwal dinonaktifkan.'),
                 backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 4),
               ),
             );
             // Navigate back
@@ -155,7 +158,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             // Stock masih ada
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('✓ ${_schedule!['med_name']} sudah diminum'),
+                content: Text('✓ ${_schedule!['med_name']} sudah diminum. Sisa stok: ${newStock.toInt()}'),
                 backgroundColor: const Color(0xFF0D9488),
               ),
             );

@@ -82,7 +82,27 @@ class NotificationService {
 
       // Request exact alarm permission (Android 12+)
       if (await Permission.scheduleExactAlarm.isDenied) {
-        await Permission.scheduleExactAlarm.request();
+        final exactAlarmStatus = await Permission.scheduleExactAlarm.request();
+        if (exactAlarmStatus.isGranted) {
+          print('✅ Exact alarm permission granted');
+        } else {
+          print('⚠️ Exact alarm permission denied');
+        }
+      }
+      
+      // Request to ignore battery optimization (untuk notifikasi tetap jalan saat app force stop)
+      final ignoringBatteryOptimizations = await Permission.ignoreBatteryOptimizations.isGranted;
+      if (!ignoringBatteryOptimizations) {
+        print('⚠️ Battery optimization is enabled, notifications may not work when app is force stopped');
+        print('💡 Requesting battery optimization exemption...');
+        
+        final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
+        if (batteryStatus.isGranted) {
+          print('✅ Battery optimization exemption granted');
+        } else {
+          print('⚠️ Battery optimization exemption denied');
+          print('💡 User can manually disable it in Settings > Apps > [App Name] > Battery > Unrestricted');
+        }
       }
     } catch (e) {
       print('❌ Error requesting permissions: $e');
