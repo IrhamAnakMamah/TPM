@@ -180,16 +180,76 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     
     try {
       // ─────────────────────────────────────────────────────────────
-      // 5. INSERT KE TABEL MEDICATIONS
+      // 5. CHECK: APAKAH OBAT SUDAH ADA? (DUPLICATE DETECTION)
       // ─────────────────────────────────────────────────────────────
-      final medicationId = await _dbHelper.insertMedication(
+      final medicationName = _nameController.text.trim();
+      final existingMed = await _dbHelper.findMedicationByNameAndDose(
         userId: userId,
-        name: _nameController.text.trim(),
-        drugType: 'prescription', // Default
-        totalStock: double.parse(_stockController.text.trim()),
-        description: null,
-        rxCui: null,
+        name: medicationName,
       );
+      
+      int medicationId;
+      
+      if (existingMed != null) {
+        // ═══════════════════════════════════════════════════════════
+        // OBAT SUDAH ADA - TANYA USER
+        // ═══════════════════════════════════════════════════════════
+        setState(() => _isSaving = false);
+        
+        final newStock = double.parse(_stockController.text.trim());
+        final choice = await _showDuplicateMedicationDialog(
+          existingMed: existingMed,
+          newStock: newStock,
+        );
+        
+        if (choice == null) {
+          // User cancel
+          return;
+        }
+        
+        setState(() => _isSaving = true);
+        
+        if (choice == 'add_to_existing') {
+          // ─────────────────────────────────────────────────────────
+          // USER PILIH: TAMBAH KE OBAT LAMA
+          // ─────────────────────────────────────────────────────────
+          medicationId = existingMed['id'] as int;
+          
+          await _dbHelper.addMedicationStock(medicationId, newStock);
+          
+          print('✅ Stock added to existing medication: $medicationId');
+          
+        } else {
+          // ─────────────────────────────────────────────────────────
+          // USER PILIH: BUAT OBAT BARU
+          // ─────────────────────────────────────────────────────────
+          medicationId = await _dbHelper.insertMedication(
+            userId: userId,
+            name: medicationName,
+            drugType: 'prescription',
+            totalStock: newStock,
+            description: null,
+            rxCui: null,
+          );
+          
+          print('✅ New medication created: $medicationId');
+        }
+        
+      } else {
+        // ═══════════════════════════════════════════════════════════
+        // OBAT BARU - LANGSUNG INSERT
+        // ═══════════════════════════════════════════════════════════
+        medicationId = await _dbHelper.insertMedication(
+          userId: userId,
+          name: medicationName,
+          drugType: 'prescription',
+          totalStock: double.parse(_stockController.text.trim()),
+          description: null,
+          rxCui: null,
+        );
+        
+        print('✅ New medication created: $medicationId');
+      }
       
       if (medicationId <= 0) {
         throw Exception('Gagal menyimpan data obat ke database');
@@ -231,7 +291,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '✅ Jadwal ${_nameController.text} berhasil disimpan!',
+                    '✅ Jadwal $medicationName berhasil disimpan!',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -272,6 +332,199 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // DUPLICATE MEDICATION DIALOG
+  // ══════════════════════════════════════════════════════════════
+
+  /// Show dialog saat detect obat duplikat
+  /// Return: 'add_to_existing' | 'create_new' | null (cancel)
+  Future<String?> _showDuplicateMedicationDialog({
+    required Map<String, dynamic> existingMed,
+    required double newStock,
+  }) async {
+    final currentStock = existingMed['total_stock'] as double;
+    final totalStock = currentStock + newStock;
+    final medName = existingMed['name'] as String;
+    
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false, // User harus pilih
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.medication,
+                color: Colors.orange.shade700,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Obat Sudah Ada',
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Anda sudah punya obat:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF0D9488).withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.medication_outlined,
+                    color: Color(0xFF0D9488),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      medName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0D9488),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildStockInfo('Stok saat ini', currentStock),
+            _buildStockInfo('Stok yang mau ditambah', newStock),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(thickness: 1),
+            ),
+            _buildStockInfo('Total stok baru', totalStock, isTotal: true),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'Apa yang ingin Anda lakukan?',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // Tombol BATAL
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text(
+              'BATAL',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          
+          // Tombol BUAT OBAT BARU
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context, 'create_new'),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF0D9488)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'BUAT OBAT BARU',
+              style: TextStyle(color: Color(0xFF0D9488)),
+            ),
+          ),
+          
+          // Tombol TAMBAH KE OBAT LAMA (Primary action)
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, 'add_to_existing'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            child: const Text(
+              'TAMBAH KE OBAT LAMA',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
+  }
+
+  /// Helper widget untuk menampilkan info stok
+  Widget _buildStockInfo(String label, double stock, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isTotal ? Colors.black : Colors.grey.shade700,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 15 : 14,
+            ),
+          ),
+          Text(
+            '${stock.toInt()} tablet',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: isTotal ? 17 : 15,
+              color: isTotal ? const Color(0xFF0D9488) : Colors.black87,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLabel(String text) {

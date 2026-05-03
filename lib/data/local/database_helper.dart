@@ -272,6 +272,60 @@ class DatabaseHelper {
   }
 
   // ════════════════════════════════════════════════
+  // DUPLICATE DETECTION & STOCK MANAGEMENT
+  // ════════════════════════════════════════════════
+
+  /// Cari medication berdasarkan nama (case-insensitive)
+  /// Hanya return jika masih ada stok (total_stock > 0)
+  Future<Map<String, dynamic>?> findMedicationByNameAndDose({
+    required int userId,
+    required String name,
+  }) async {
+    final db = await database;
+    
+    final result = await db.query(
+      'medications',
+      where: 'user_id = ? AND LOWER(TRIM(name)) = ? AND total_stock > 0',
+      whereArgs: [userId, name.toLowerCase().trim()],
+    );
+    
+    if (result.isEmpty) return null;
+    return result.first;
+  }
+
+  /// Tambah stok ke medication existing
+  /// Return: jumlah rows yang di-update (1 jika sukses, 0 jika gagal)
+  Future<int> addMedicationStock(int medId, double additionalStock) async {
+    final db = await database;
+    
+    // Get current stock
+    final result = await db.query(
+      'medications',
+      columns: ['total_stock'],
+      where: 'id = ?',
+      whereArgs: [medId],
+    );
+    
+    if (result.isEmpty) {
+      print('❌ Medication not found: $medId');
+      return 0;
+    }
+    
+    final currentStock = result.first['total_stock'] as double;
+    final newStock = currentStock + additionalStock;
+    
+    print('📦 Adding stock: $currentStock + $additionalStock = $newStock');
+    
+    // Update stock
+    return await db.update(
+      'medications',
+      {'total_stock': newStock},
+      where: 'id = ?',
+      whereArgs: [medId],
+    );
+  }
+
+  // ════════════════════════════════════════════════
   // CRUD SCHEDULES
   // ════════════════════════════════════════════════
 
