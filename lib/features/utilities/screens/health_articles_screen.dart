@@ -143,6 +143,15 @@ class _HealthArticlesScreenState extends State<HealthArticlesScreen> {
                           }
                           
                           // Regular articles (skip first one as it's featured)
+                          // index 1 -> _articles[1], index 2 -> _articles[2], etc.
+                          // So we use index directly (not index-1) because we want to skip _articles[0]
+                          // But itemCount is _articles.length + 1, so max index is _articles.length
+                          // When index = _articles.length, we try to access _articles[_articles.length] which is out of bounds
+                          // FIX: We should use index-1 to skip the first article OR change itemCount
+                          
+                          // Better approach: just show all articles starting from index 1
+                          if (index >= _articles.length) return const SizedBox();
+                          
                           final article = _articles[index];
                           return _buildArticleTile(
                             article['title'] ?? 'No Title',
