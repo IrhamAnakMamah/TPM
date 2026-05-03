@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/session_manager.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../data/local/database_helper.dart';
 
 class AddScheduleScreen extends StatefulWidget {
@@ -335,6 +336,21 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
       if (scheduleId <= 0) {
         throw Exception('Gagal menyimpan jadwal ke database');
       }
+      
+      print('✅ Schedule created: $scheduleId');
+      
+      // ─────────────────────────────────────────────────────────────
+      // 6.5. SCHEDULE NOTIFICATION
+      // ─────────────────────────────────────────────────────────────
+      await NotificationService().scheduleMedicationReminder(
+        scheduleId: scheduleId,
+        medicationName: medicationName,
+        timeIntake: _timeController.text.trim(),
+        dosage: dosage,
+        dosageUnit: _dosageUnit,
+      );
+      
+      print('✅ Notification scheduled for schedule: $scheduleId');
       
       // ─────────────────────────────────────────────────────────────
       // 7. TAMPILKAN SUCCESS MESSAGE

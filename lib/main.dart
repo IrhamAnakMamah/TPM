@@ -5,10 +5,16 @@ import 'core/constants/app_theme.dart';
 import 'features/auth/screens/auth_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/dashboard/screens/main_screen.dart';
+// Import notification service
+import 'core/services/notification_service.dart';
 
-void main() {
+void main() async {
   // Memastikan binding Flutter terinisialisasi sebelum menjalankan app
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize notification service
+  await NotificationService().initialize();
+  
   runApp(const TugasAkhirApp());
 }
 
