@@ -103,6 +103,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0D9488),
+              foregroundColor: Colors.white,
             ),
             child: const Text('SUDAH'),
           ),

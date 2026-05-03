@@ -607,6 +607,8 @@ class DatabaseHelper {
         final currentStock = medResult.first['total_stock'] as double;
         final newStock = currentStock - dosage;
         
+        print('📊 Confirm Medication: currentStock=$currentStock, dosage=$dosage, newStock=$newStock');
+        
         // 2. Update stok
         await txn.update(
           'medications',
@@ -614,6 +616,8 @@ class DatabaseHelper {
           where: 'id = ?',
           whereArgs: [medId],
         );
+        
+        print('✅ Stock updated to: ${newStock > 0 ? newStock : 0}');
         
         // 3. Log konsumsi
         await txn.insert('intake_logs', {
@@ -623,8 +627,12 @@ class DatabaseHelper {
           'note': null,
         });
         
+        print('✅ Intake log created');
+        
         // 4. Jika stok habis, hapus medication dan semua schedules terkait
         if (newStock <= 0) {
+          print('⚠️ Stock is 0 or less, deleting medication...');
+          
           // Set semua schedules jadi expired
           await txn.update(
             'schedules',
@@ -641,6 +649,8 @@ class DatabaseHelper {
           );
           
           print('🗑️ Medication deleted (stock = 0): $medId');
+        } else {
+          print('✅ Stock still available: $newStock');
         }
       });
       
