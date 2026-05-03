@@ -215,9 +215,66 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           // ─────────────────────────────────────────────────────────
           medicationId = existingMed['id'] as int;
           
+          // Tambah stok ke medication yang sudah ada
           await _dbHelper.addMedicationStock(medicationId, newStock);
           
           print('✅ Stock added to existing medication: $medicationId');
+          
+          // Update schedule yang sudah ada (jangan buat baru)
+          // Ambil schedule_id dari existing medication
+          final existingSchedules = await _dbHelper.getSchedulesByMedicationId(medicationId);
+          
+          if (existingSchedules.isNotEmpty) {
+            // Update schedule pertama yang ditemukan
+            final scheduleId = existingSchedules.first['id'] as int;
+            
+            // Parse dosis (default 1 jika kosong)
+            final dosage = _dosageController.text.trim().isEmpty 
+                ? 1.0 
+                : double.parse(_dosageController.text.trim());
+            
+            await _dbHelper.updateSchedule(
+              scheduleId: scheduleId,
+              timeIntake: _timeController.text.trim(),
+              dosage: dosage,
+              dosageUnit: _dosageUnit,
+              frequencyType: _frequencyType,
+              frequencyValue: _frequencyType == 'every_n_hours' 
+                  ? int.parse(_freqValueController.text.trim()) 
+                  : 1,
+            );
+            
+            print('✅ Schedule updated: $scheduleId');
+            
+            // Skip schedule creation (langsung ke success message)
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.white),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '✅ Stok $medicationName berhasil ditambahkan!',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: const Color(0xFF0D9488),
+                  duration: const Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              
+              Navigator.of(context).pop();
+              Navigator.of(context).pop();
+            }
+            
+            // CRITICAL: Return OUTSIDE if (mounted) to prevent schedule creation
+            return;
+          }
           
         } else {
           // ─────────────────────────────────────────────────────────
@@ -350,7 +407,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     
     return showDialog<String>(
       context: context,
-      barrierDismissible: false, // User harus pilih
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -360,12 +417,12 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: const Color(0xFF0D9488).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.medication,
-                color: Colors.orange.shade700,
+                color: Color(0xFF0D9488),
                 size: 28,
               ),
             ),
@@ -373,7 +430,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
             const Expanded(
               child: Text(
                 'Obat Sudah Ada',
-                style: TextStyle(fontSize: 20),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -382,69 +439,53 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Anda sudah punya obat:',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 8),
+            // Nama obat
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withOpacity(0.1),
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: const Color(0xFF0D9488).withOpacity(0.3),
-                ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.medication_outlined,
-                    color: Color(0xFF0D9488),
-                  ),
+                  const Icon(Icons.medication_outlined, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       medName,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D9488),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            
+            // Info stok
             _buildStockInfo('Stok saat ini', currentStock),
-            _buildStockInfo('Stok yang mau ditambah', newStock),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Divider(thickness: 1),
-            ),
-            _buildStockInfo('Total stok baru', totalStock, isTotal: true),
-            const SizedBox(height: 20),
+            _buildStockInfo('Stok baru', newStock),
+            const Divider(height: 24),
+            _buildStockInfo('Total stok', totalStock, isTotal: true),
+            const SizedBox(height: 16),
+            
+            // Info message
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                  const SizedBox(width: 10),
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 18),
+                  const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Apa yang ingin Anda lakukan?',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+                      'Tambahkan ke obat yang sudah ada?',
+                      style: TextStyle(fontSize: 13),
                     ),
                   ),
                 ],
@@ -456,28 +497,19 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
           // Tombol BATAL
           TextButton(
             onPressed: () => Navigator.pop(context, null),
+            child: const Text('BATAL'),
+          ),
+          
+          // Tombol BUAT BARU
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'create_new'),
             child: const Text(
-              'BATAL',
+              'BUAT BARU',
               style: TextStyle(color: Colors.grey),
             ),
           ),
           
-          // Tombol BUAT OBAT BARU
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context, 'create_new'),
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFF0D9488)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text(
-              'BUAT OBAT BARU',
-              style: TextStyle(color: Color(0xFF0D9488)),
-            ),
-          ),
-          
-          // Tombol TAMBAH KE OBAT LAMA (Primary action)
+          // Tombol TAMBAH (Primary)
           ElevatedButton(
             onPressed: () => Navigator.pop(context, 'add_to_existing'),
             style: ElevatedButton.styleFrom(
@@ -486,12 +518,8 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
-            child: const Text(
-              'TAMBAH KE OBAT LAMA',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            child: const Text('TAMBAH'),
           ),
         ],
         actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),

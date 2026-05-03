@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/session_manager.dart';
 import '../../../data/local/database_helper.dart';
 import '../../pharmacy_map/screens/map_screen.dart';
+import '../../medications/screens/medication_list_screen.dart';
 import 'schedule_choice_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -174,11 +175,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Text('Jadwal Hari Ini', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 if (_todaySchedules.isNotEmpty)
                   TextButton(
-                    onPressed: () {
-                      // TODO: Navigate ke MedicationListScreen
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Fitur "Lihat Semua" akan tersedia di Task 5')),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const MedicationListScreen(),
+                        ),
                       );
+                      // Refresh data setelah kembali dari MedicationListScreen
+                      _loadTodaySchedules();
                     },
                     child: const Text('Lihat Semua'),
                   ),

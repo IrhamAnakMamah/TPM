@@ -283,11 +283,18 @@ class DatabaseHelper {
   }) async {
     final db = await database;
     
+    print('🔍 Searching medication: userId=$userId, name=$name');
+    
     final result = await db.query(
       'medications',
       where: 'user_id = ? AND LOWER(TRIM(name)) = ? AND total_stock > 0',
       whereArgs: [userId, name.toLowerCase().trim()],
     );
+    
+    print('📊 Found ${result.length} medications');
+    if (result.isNotEmpty) {
+      print('   → Medication: ${result.first}');
+    }
     
     if (result.isEmpty) return null;
     return result.first;
@@ -380,9 +387,92 @@ class DatabaseHelper {
   }
 
   /// Hapus jadwal
+  /// Juga hapus medication jika tidak ada schedule lain yang menggunakan medication tersebut
   Future<int> deleteSchedule(int scheduleId) async {
     final db = await database;
-    return await db.delete('schedules', where: 'id = ?', whereArgs: [scheduleId]);
+    
+    // 1. Ambil medication_id dari schedule yang akan dihapus
+    final scheduleResult = await db.query(
+      'schedules',
+      columns: ['med_id'],
+      where: 'id = ?',
+      whereArgs: [scheduleId],
+    );
+    
+    if (scheduleResult.isEmpty) {
+      print('⚠️ Schedule not found: $scheduleId');
+      return 0;
+    }
+    
+    final medId = scheduleResult.first['med_id'] as int;
+    print('📋 Deleting schedule $scheduleId for medication $medId');
+    
+    // 2. Hapus schedule
+    final deletedRows = await db.delete(
+      'schedules',
+      where: 'id = ?',
+      whereArgs: [scheduleId],
+    );
+    
+    print('✅ Schedule deleted: $deletedRows rows');
+    
+    // 3. Cek apakah masih ada schedule lain untuk medication ini (ANY status)
+    final remainingSchedules = await db.query(
+      'schedules',
+      where: 'med_id = ?',
+      whereArgs: [medId],
+    );
+    
+    print('📊 Remaining schedules for medication $medId: ${remainingSchedules.length}');
+    
+    // 4. Jika tidak ada schedule lain (apapun statusnya), hapus medication juga
+    if (remainingSchedules.isEmpty) {
+      final deletedMed = await db.delete(
+        'medications',
+        where: 'id = ?',
+        whereArgs: [medId],
+      );
+      print('🗑️ Medication deleted: $deletedMed rows (no remaining schedules)');
+    } else {
+      print('⚠️ Medication NOT deleted (still has ${remainingSchedules.length} schedules)');
+    }
+    
+    return deletedRows;
+  }
+
+  /// Ambil schedules berdasarkan medication_id
+  Future<List<Map<String, dynamic>>> getSchedulesByMedicationId(int medicationId) async {
+    final db = await database;
+    return await db.query(
+      'schedules',
+      where: 'med_id = ? AND status = ?',
+      whereArgs: [medicationId, 'active'],
+      orderBy: 'time_intake ASC',
+    );
+  }
+
+  /// Update schedule yang sudah ada
+  Future<int> updateSchedule({
+    required int scheduleId,
+    required String timeIntake,
+    required double dosage,
+    required String dosageUnit,
+    required String frequencyType,
+    required int frequencyValue,
+  }) async {
+    final db = await database;
+    return await db.update(
+      'schedules',
+      {
+        'time_intake': timeIntake,
+        'dosage': dosage,
+        'dosage_unit': dosageUnit,
+        'frequency_type': frequencyType,
+        'frequency_value': frequencyValue,
+      },
+      where: 'id = ?',
+      whereArgs: [scheduleId],
+    );
   }
 
   // ════════════════════════════════════════════════
@@ -500,14 +590,24 @@ class DatabaseHelper {
           'note': null,
         });
         
-        // 4. Jika stok habis, set jadwal jadi expired
+        // 4. Jika stok habis, hapus medication dan semua schedules terkait
         if (newStock <= 0) {
+          // Set semua schedules jadi expired
           await txn.update(
             'schedules',
             {'status': 'expired'},
-            where: 'id = ?',
-            whereArgs: [scheduleId],
+            where: 'med_id = ?',
+            whereArgs: [medId],
           );
+          
+          // Hapus medication
+          await txn.delete(
+            'medications',
+            where: 'id = ?',
+            whereArgs: [medId],
+          );
+          
+          print('🗑️ Medication deleted (stock = 0): $medId');
         }
       });
       
