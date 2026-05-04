@@ -2,6 +2,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
+import 'shake_detector.dart';
+import '../../data/local/database_helper.dart';
 
 /// Service untuk mengelola notifikasi lokal
 /// Menggunakan flutter_local_notifications untuk reminder minum obat
@@ -12,6 +14,7 @@ class NotificationService {
   factory NotificationService() => _instance;
 
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
+  final DatabaseHelper _dbHelper = DatabaseHelper();
   bool _isInitialized = false;
 
   // ══════════════════════════════════════════════════════════════
@@ -112,10 +115,31 @@ class NotificationService {
   /// Handle notification tap
   void _onNotificationTapped(NotificationResponse response) {
     print('🔔 Notification tapped: ${response.payload}');
+    print('🔔 Action ID: ${response.actionId}');
     
-    // TODO: Navigate to medication detail screen
-    // Parse payload to get schedule_id
-    // Navigator.push to MedicationDetailScreen
+    // Handle notification actions
+    if (response.actionId == 'snooze') {
+      // Snooze button tapped
+      final scheduleId = int.tryParse(response.payload ?? '0');
+      if (scheduleId != null && scheduleId > 0) {
+        print('⏰ Snooze button tapped for schedule $scheduleId');
+        snoozeNotification(scheduleId);
+      }
+    } else if (response.actionId == 'taken') {
+      // Sudah Minum button tapped
+      final scheduleId = int.tryParse(response.payload ?? '0');
+      if (scheduleId != null && scheduleId > 0) {
+        print('✅ Sudah Minum button tapped for schedule $scheduleId');
+        // Stop shake detector
+        ShakeDetector().stopListening();
+        // TODO: Navigate to medication detail screen or mark as taken
+      }
+    } else {
+      // Notification body tapped (no action)
+      // TODO: Navigate to medication detail screen
+      // Parse payload to get schedule_id
+      // Navigator.push to MedicationDetailScreen
+    }
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -167,7 +191,7 @@ class NotificationService {
       }
 
       // Notification details
-      const androidDetails = AndroidNotificationDetails(
+      final androidDetails = AndroidNotificationDetails(
         'medication_reminder', // channel id
         'Pengingat Minum Obat', // channel name
         channelDescription: 'Notifikasi untuk mengingatkan waktu minum obat',
@@ -177,6 +201,21 @@ class NotificationService {
         enableVibration: true,
         playSound: true,
         icon: '@mipmap/ic_launcher',
+        // Add notification actions (Snooze & Sudah Minum)
+        actions: const [
+          AndroidNotificationAction(
+            'snooze',
+            'Snooze 10 menit',
+            showsUserInterface: false,
+            cancelNotification: false,
+          ),
+          AndroidNotificationAction(
+            'taken',
+            'Sudah Minum',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+        ],
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -185,7 +224,7 @@ class NotificationService {
         presentSound: true,
       );
 
-      const notificationDetails = NotificationDetails(
+      final notificationDetails = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
@@ -205,8 +244,114 @@ class NotificationService {
 
       print('✅ Notification scheduled for $medicationName at $timeIntake (ID: $scheduleId)');
       print('   Next notification: $scheduledDate');
+      
+      // Start shake detector when notification is scheduled
+      // Note: Shake detector will only work when app is in foreground/background
+      // It won't work if app is force-stopped (Android limitation)
+      print('🔔 Starting shake detector for schedule $scheduleId');
+      ShakeDetector().startListening(
+        scheduleId,
+        () => snoozeNotification(scheduleId),
+      );
     } catch (e) {
       print('❌ Error scheduling notification: $e');
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SNOOZE NOTIFICATION
+  // ══════════════════════════════════════════════════════════════
+
+  /// Snooze notification for 10 minutes
+  /// 
+  /// Called when:
+  /// - User shakes device (via ShakeDetector)
+  /// - User taps "Snooze 10 menit" button on notification
+  /// 
+  /// Parameters:
+  /// - scheduleId: ID dari schedule di database
+  Future<void> snoozeNotification(int scheduleId) async {
+    if (!_isInitialized) {
+      print('⚠️ NotificationService not initialized');
+      return;
+    }
+
+    try {
+      print('⏰ Snoozing notification for schedule $scheduleId');
+
+      // Get schedule data from database
+      final schedule = await _dbHelper.getScheduleById(scheduleId);
+      if (schedule == null) {
+        print('❌ Schedule not found: $scheduleId');
+        return;
+      }
+
+      // Cancel current notification
+      await _notifications.cancel(scheduleId);
+
+      // Calculate snooze time (+10 minutes from now)
+      final snoozeTime = tz.TZDateTime.now(tz.local).add(
+        const Duration(minutes: ShakeDetector.snoozeDurationMinutes),
+      );
+
+      // Get medication name
+      final medication = await _dbHelper.getMedicationById(schedule['med_id']);
+      final medicationName = medication?['name'] ?? 'Obat';
+
+      // Notification details (same as original)
+      final androidDetails = AndroidNotificationDetails(
+        'medication_reminder',
+        'Pengingat Minum Obat',
+        channelDescription: 'Notifikasi untuk mengingatkan waktu minum obat',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        enableVibration: true,
+        playSound: true,
+        icon: '@mipmap/ic_launcher',
+        actions: const [
+          AndroidNotificationAction(
+            'snooze',
+            'Snooze 10 menit',
+            showsUserInterface: false,
+            cancelNotification: false,
+          ),
+          AndroidNotificationAction(
+            'taken',
+            'Sudah Minum',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+        ],
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Schedule snooze notification
+      await _notifications.zonedSchedule(
+        scheduleId,
+        '⏰ Waktunya Minum Obat! (Snooze)',
+        '$medicationName - ${schedule['dosage'].toInt()} ${schedule['dosage_unit']}',
+        snoozeTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        payload: scheduleId.toString(),
+      );
+
+      print('✅ Notification snoozed until ${snoozeTime.toString()}');
+      print('   Snooze count: ${ShakeDetector().snoozeCount}/${ShakeDetector.maxSnoozeCount}');
+    } catch (e) {
+      print('❌ Error snoozing notification: $e');
     }
   }
 
