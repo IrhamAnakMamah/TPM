@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../core/services/notification_service.dart';
+import '../../core/services/notification_service.dart';
 
 /// Helper database SQLite lokal untuk menyimpan data obat & jadwal.
 ///
@@ -256,6 +256,20 @@ class DatabaseHelper {
       whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
+  }
+
+  /// Ambil obat berdasarkan ID
+  Future<Map<String, dynamic>?> getMedicationById(int medId) async {
+    final db = await database;
+    final results = await db.query(
+      'medications',
+      where: 'id = ?',
+      whereArgs: [medId],
+      limit: 1,
+    );
+    
+    if (results.isEmpty) return null;
+    return results.first;
   }
 
   /// Update stok obat (dipanggil saat konfirmasi minum)

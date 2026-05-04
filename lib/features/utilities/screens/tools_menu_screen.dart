@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'conversion_screen.dart';
 import 'mini_game_screen.dart';
 import 'health_articles_screen.dart';
+import '../../pharmacy_map/screens/map_screen.dart';
 // import 'history_screen.dart'; // Tetep di-comment biar aman
 
 class ToolsMenuScreen extends StatelessWidget {
@@ -61,6 +62,15 @@ class ToolsMenuScreen extends StatelessWidget {
               icon: Icons.article,
               color: const Color(0xFFF59E0B),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => HealthArticlesScreen())),
+            ),
+            
+            // 5. MENU PETA APOTEK
+            _buildMenuCard(
+              context,
+              title: 'Peta\nApotek',
+              icon: Icons.local_pharmacy,
+              color: const Color(0xFF0D9488),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => MapScreen())),
             ),
           ],
         ),
