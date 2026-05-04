@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/session_manager.dart';
+import '../../../core/services/shake_detector.dart';
 import '../../../data/local/database_helper.dart';
 
 class MedicationDetailScreen extends StatefulWidget {
@@ -121,6 +122,10 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     );
     
     if (confirmed != true) return;
+    
+    // Stop shake detector (user confirmed, no more snooze needed)
+    print('🔔 Stopping shake detector for schedule ${widget.scheduleId}');
+    ShakeDetector().stopListening();
     
     setState(() => _isConfirming = true);
     
