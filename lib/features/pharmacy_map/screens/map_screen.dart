@@ -243,35 +243,48 @@ class _MapScreenState extends State<MapScreen> {
 
   // Open in Google Maps
   Future<void> _openInGoogleMaps(Pharmacy pharmacy) async {
-    final url = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1'
-      '&destination=${pharmacy.lat},${pharmacy.lng}'
-      '&travelmode=driving',
-    );
+    // Try multiple URL schemes for better compatibility
+    final urls = [
+      // 1. Google Maps app (geo: scheme)
+      Uri.parse('geo:0,0?q=${pharmacy.lat},${pharmacy.lng}(${Uri.encodeComponent(pharmacy.name)})'),
+      
+      // 2. Google Maps web (fallback)
+      Uri.parse(
+        'https://www.google.com/maps/dir/?api=1'
+        '&destination=${pharmacy.lat},${pharmacy.lng}'
+        '&travelmode=driving',
+      ),
+    ];
 
-    try {
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tidak dapat membuka Google Maps'),
-              backgroundColor: Colors.red,
-            ),
-          );
+    bool launched = false;
+    String? errorMessage;
+
+    for (var url in urls) {
+      try {
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+          launched = true;
+          break;
         }
+      } catch (e) {
+        errorMessage = e.toString();
+        print('Error launching $url: $e');
+        continue;
       }
-    } catch (e) {
-      print('Error launching Google Maps: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+    }
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMessage != null 
+              ? 'Error: $errorMessage'
+              : 'Tidak dapat membuka Google Maps. Pastikan Google Maps terinstall.',
           ),
-        );
-      }
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -418,11 +431,11 @@ class _MapScreenState extends State<MapScreen> {
 
           // 4. HORIZONTAL CARD SLIDER (BAWAH)
           Positioned(
-            bottom: 30,
+            bottom: 20,
             left: 0,
             right: 0,
             child: SizedBox(
-              height: 140,
+              height: 130,
               child: _pharmacies.isEmpty
                   ? Center(
                       child: Container(
@@ -455,7 +468,7 @@ class _MapScreenState extends State<MapScreen> {
                           child: Container(
                             width: 300,
                             margin: const EdgeInsets.only(right: 15),
-                            padding: const EdgeInsets.all(15),
+                            padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
@@ -467,15 +480,15 @@ class _MapScreenState extends State<MapScreen> {
                                 Row(
                                   children: [
                                     Container(
-                                      width: 50,
-                                      height: 50,
+                                      width: 45,
+                                      height: 45,
                                       decoration: BoxDecoration(
                                         color: Colors.teal.shade50,
                                         borderRadius: BorderRadius.circular(12),
                                       ),
-                                      child: const Icon(Icons.local_pharmacy, color: Colors.teal, size: 28),
+                                      child: const Icon(Icons.local_pharmacy, color: Colors.teal, size: 26),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,17 +497,17 @@ class _MapScreenState extends State<MapScreen> {
                                             pharmacy.name,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                              fontSize: 13,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          const SizedBox(height: 4),
+                                          const SizedBox(height: 3),
                                           Text(
                                             "${pharmacy.distance?.toStringAsFixed(1)} km • ${pharmacy.isOpen ? 'Buka' : 'Tutup'}",
                                             style: TextStyle(
                                               color: pharmacy.isOpen ? Colors.green : Colors.red,
-                                              fontSize: 12,
+                                              fontSize: 11,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -503,33 +516,33 @@ class _MapScreenState extends State<MapScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 8),
                                 Text(
                                   pharmacy.address,
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: Text(
                                         pharmacy.openHours,
-                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
                                       ),
                                     ),
                                     ElevatedButton(
                                       onPressed: () => _openInGoogleMaps(pharmacy),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.teal,
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                                         minimumSize: Size.zero,
                                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       ),
                                       child: const Text(
                                         'Navigasi',
-                                        style: TextStyle(fontSize: 12, color: Colors.white),
+                                        style: TextStyle(fontSize: 11, color: Colors.white),
                                       ),
                                     ),
                                   ],
