@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/session_manager.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../data/local/database_helper.dart';
 
 class AddScheduleScreen extends StatefulWidget {
@@ -18,7 +19,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   final _stockController = TextEditingController();
   final _timeController = TextEditingController();
 
-  String _dosageUnit = 'mg';
+  String _dosageUnit = 'tablet';
   String _frequencyType = 'daily';
   final _freqValueController = TextEditingController(text: '1');
 
@@ -336,6 +337,21 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
         throw Exception('Gagal menyimpan jadwal ke database');
       }
       
+      print('✅ Schedule created: $scheduleId');
+      
+      // ─────────────────────────────────────────────────────────────
+      // 6.5. SCHEDULE NOTIFICATION
+      // ─────────────────────────────────────────────────────────────
+      await NotificationService().scheduleMedicationReminder(
+        scheduleId: scheduleId,
+        medicationName: medicationName,
+        timeIntake: _timeController.text.trim(),
+        dosage: dosage,
+        dosageUnit: _dosageUnit,
+      );
+      
+      print('✅ Notification scheduled for schedule: $scheduleId');
+      
       // ─────────────────────────────────────────────────────────────
       // 7. TAMPILKAN SUCCESS MESSAGE
       // ─────────────────────────────────────────────────────────────
@@ -646,7 +662,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
               ),
             ),
 
-            _buildLabel('Dosis & Satuan'),
+            _buildLabel('Jumlah Sekali Minum'),
             Row(
               children: [
                 Expanded(
@@ -659,7 +675,9 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
-                      hintText: 'Contoh: 500',
+                      hintText: 'Contoh: 1 atau 2',
+                      helperText: 'Berapa banyak diminum sekali?',
+                      helperStyle: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                   ),
                 ),
@@ -675,7 +693,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.teal, width: 2)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
-                    items: ['mg', 'ml', 'tablet', 'kapsul'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                    items: ['tablet', 'kapsul', 'sendok', 'tetes'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                     onChanged: (val) => setState(() => _dosageUnit = val!),
                   ),
                 ),

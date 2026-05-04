@@ -1,5 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../../core/services/notification_service.dart';
 
 /// Helper database SQLite lokal untuk menyimpan data obat & jadwal.
 ///
@@ -233,6 +234,9 @@ class DatabaseHelper {
     String? rxCui,
   }) async {
     final db = await database;
+    
+    print('📝 INSERT MEDICATION: userId=$userId, name=$name, totalStock=$totalStock');
+    
     return await db.insert('medications', {
       'user_id': userId,
       'name': name,
@@ -252,6 +256,20 @@ class DatabaseHelper {
       whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
+  }
+
+  /// Ambil obat berdasarkan ID
+  Future<Map<String, dynamic>?> getMedicationById(int medId) async {
+    final db = await database;
+    final results = await db.query(
+      'medications',
+      where: 'id = ?',
+      whereArgs: [medId],
+      limit: 1,
+    );
+    
+    if (results.isEmpty) return null;
+    return results.first;
   }
 
   /// Update stok obat (dipanggil saat konfirmasi minum)
@@ -347,6 +365,9 @@ class DatabaseHelper {
     String? notes,
   }) async {
     final db = await database;
+    
+    print('📝 INSERT SCHEDULE: medId=$medId, dosage=$dosage, dosageUnit=$dosageUnit');
+    
     return await db.insert('schedules', {
       'med_id': medId,
       'time_intake': timeIntake,
@@ -448,6 +469,39 @@ class DatabaseHelper {
       where: 'med_id = ? AND status = ?',
       whereArgs: [medicationId, 'active'],
       orderBy: 'time_intake ASC',
+    );
+  }
+
+  /// Ambil detail schedule berdasarkan ID (dengan info medication)
+  Future<Map<String, dynamic>?> getScheduleById(int scheduleId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT 
+        s.*,
+        m.name as med_name,
+        m.total_stock,
+        m.drug_type,
+        m.user_id
+      FROM schedules s
+      JOIN medications m ON s.med_id = m.id
+      WHERE s.id = ?
+    ''', [scheduleId]);
+    
+    if (result.isEmpty) return null;
+    return result.first;
+  }
+
+  /// Ambil riwayat konsumsi hari ini untuk schedule tertentu
+  Future<List<Map<String, dynamic>>> getTodayIntakeLogs(int scheduleId) async {
+    final db = await database;
+    final today = DateTime.now();
+    final startOfDay = DateTime(today.year, today.month, today.day).toIso8601String();
+    
+    return await db.query(
+      'intake_logs',
+      where: 'schedule_id = ? AND timestamp >= ?',
+      whereArgs: [scheduleId, startOfDay],
+      orderBy: 'timestamp DESC',
     );
   }
 
@@ -574,6 +628,8 @@ class DatabaseHelper {
         final currentStock = medResult.first['total_stock'] as double;
         final newStock = currentStock - dosage;
         
+        print('📊 Confirm Medication: currentStock=$currentStock, dosage=$dosage, newStock=$newStock');
+        
         // 2. Update stok
         await txn.update(
           'medications',
@@ -581,6 +637,8 @@ class DatabaseHelper {
           where: 'id = ?',
           whereArgs: [medId],
         );
+        
+        print('✅ Stock updated to: ${newStock > 0 ? newStock : 0}');
         
         // 3. Log konsumsi
         await txn.insert('intake_logs', {
@@ -590,24 +648,30 @@ class DatabaseHelper {
           'note': null,
         });
         
-        // 4. Jika stok habis, hapus medication dan semua schedules terkait
+        print('✅ Intake log created');
+        
+        // 4. Jika stok habis atau kurang, set schedule jadi expired (JANGAN DELETE MEDICATION)
         if (newStock <= 0) {
-          // Set semua schedules jadi expired
-          await txn.update(
+          print('⚠️ Stock is 0 or less ($newStock), setting schedules to expired...');
+          
+          // Set semua schedules untuk medication ini jadi expired
+          final updatedSchedules = await txn.update(
             'schedules',
             {'status': 'expired'},
             where: 'med_id = ?',
             whereArgs: [medId],
           );
           
-          // Hapus medication
-          await txn.delete(
-            'medications',
-            where: 'id = ?',
-            whereArgs: [medId],
-          );
+          print('✅ $updatedSchedules schedule(s) set to expired (medication NOT deleted)');
           
-          print('🗑️ Medication deleted (stock = 0): $medId');
+          // TODO: Show low stock notification
+          // await NotificationService().showLowStockNotification(
+          //   medicationName: medName,
+          //   remainingStock: 0,
+          //   dosageUnit: dosageUnit,
+          // );
+        } else {
+          print('✅ Stock still available: $newStock');
         }
       });
       
@@ -616,6 +680,7 @@ class DatabaseHelper {
         'message': 'Konsumsi obat berhasil dicatat',
       };
     } catch (e) {
+      print('❌ Error in confirmMedicationTaken: $e');
       return {
         'success': false,
         'message': 'Gagal mencatat konsumsi: $e',

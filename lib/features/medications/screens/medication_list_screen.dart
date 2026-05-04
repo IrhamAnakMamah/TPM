@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/session_manager.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../data/local/database_helper.dart';
 import '../../dashboard/screens/schedule_choice_screen.dart';
+import 'medication_detail_screen.dart';
 
 class MedicationListScreen extends StatefulWidget {
   const MedicationListScreen({super.key});
@@ -132,6 +134,10 @@ class _MedicationListScreenState extends State<MedicationListScreen> {
     // Delete from database
     try {
       await _dbHelper.deleteSchedule(scheduleId);
+      
+      // Cancel notification
+      await NotificationService().cancelNotification(scheduleId);
+      print('✅ Notification cancelled for schedule: $scheduleId');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -331,13 +337,21 @@ class _MedicationListScreenState extends State<MedicationListScreen> {
         ],
       ),
       child: InkWell(
-        onTap: () {
-          // TODO: Navigate to detail screen (Task 6)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Fitur detail akan tersedia di Task 6'),
+        onTap: () async {
+          // Navigate to detail screen
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MedicationDetailScreen(
+                scheduleId: scheduleId,
+              ),
             ),
           );
+          
+          // Reload if medication was deleted (stock = 0)
+          if (result == true) {
+            _loadSchedules();
+          }
         },
         borderRadius: BorderRadius.circular(18),
         child: Padding(

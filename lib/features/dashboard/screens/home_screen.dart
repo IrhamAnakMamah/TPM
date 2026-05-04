@@ -3,6 +3,7 @@ import '../../../core/services/session_manager.dart';
 import '../../../data/local/database_helper.dart';
 import '../../pharmacy_map/screens/map_screen.dart';
 import '../../medications/screens/medication_list_screen.dart';
+import '../../medications/screens/medication_detail_screen.dart';
 import 'schedule_choice_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -265,6 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Build schedule card dari data database
   Widget _buildScheduleCard(Map<String, dynamic> schedule) {
+    final scheduleId = schedule['id'] as int;
     final medName = schedule['med_name'] as String;
     final timeIntake = schedule['time_intake'] as String;
     final dosage = schedule['dosage'] as double;
@@ -285,7 +287,6 @@ class _HomeScreenState extends State<HomeScreen> {
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -304,68 +305,90 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isDone 
-                  ? Colors.teal.shade50 
-                  : isLowStock 
-                      ? Colors.orange.shade50 
-                      : Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () async {
+          // Navigate to detail screen
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MedicationDetailScreen(
+                scheduleId: scheduleId,
+              ),
             ),
-            child: Icon(
-              isDone 
-                  ? Icons.check_circle 
-                  : isLowStock 
-                      ? Icons.warning_amber_rounded 
-                      : Icons.pending_actions,
-              color: isDone 
-                  ? Colors.teal 
-                  : isLowStock 
-                      ? Colors.orange 
-                      : Colors.blue,
-            ),
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
+          );
+          
+          // Reload if medication was deleted
+          if (result == true) {
+            _loadTodaySchedules();
+          }
+        },
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDone 
+                      ? Colors.teal.shade50 
+                      : isLowStock 
+                          ? Colors.orange.shade50 
+                          : Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '$displayTime • $displayNote',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 12,
-                  ),
+                child: Icon(
+                  isDone 
+                      ? Icons.check_circle 
+                      : isLowStock 
+                          ? Icons.warning_amber_rounded 
+                          : Icons.pending_actions,
+                  color: isDone 
+                      ? Colors.teal 
+                      : isLowStock 
+                          ? Colors.orange 
+                          : Colors.blue,
                 ),
-                if (isLowStock) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '⚠️ Stok tinggal ${totalStock.toInt()}',
-                    style: TextStyle(
-                      color: Colors.orange.shade700,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$displayTime • $displayNote',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (isLowStock) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '⚠️ Stok tinggal ${totalStock.toInt()}',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (!isDone)
+                const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            ],
           ),
-          if (!isDone)
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        ],
+        ),
       ),
     );
   }

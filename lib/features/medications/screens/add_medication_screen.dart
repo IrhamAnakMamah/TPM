@@ -18,7 +18,7 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
   final _stockCtrl = TextEditingController();
   final _freqValCtrl = TextEditingController();
   
-  String _dosageUnit = 'mg';
+  String _dosageUnit = 'tablet';
   String _freqType = 'daily';
   TimeOfDay _selectedTime = TimeOfDay.now();
 
@@ -48,14 +48,14 @@ class _AddMedicationScreenState extends State<AddMedicationScreen> {
               children: [
                 Expanded(child: _buildTextField(label: 'Stok Awal', controller: _stockCtrl, isNumber: true, icon: Icons.inventory_2)),
                 const SizedBox(width: 15),
-                Expanded(child: _buildTextField(label: 'Dosis', controller: _doseCtrl, isNumber: true, icon: Icons.science)),
+                Expanded(child: _buildTextField(label: 'Jumlah Sekali Minum', controller: _doseCtrl, isNumber: true, icon: Icons.science)),
               ],
             ),
             const SizedBox(height: 15),
             DropdownButtonFormField<String>(
               value: _dosageUnit,
-              decoration: _inputDeco('Satuan Dosis', Icons.scale),
-              items: ['mg', 'ml', 'tablet', 'kapsul'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              decoration: _inputDeco('Satuan', Icons.scale),
+              items: ['tablet', 'kapsul', 'sendok', 'tetes'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
               onChanged: (val) => setState(() => _dosageUnit = val!),
             ),
             
