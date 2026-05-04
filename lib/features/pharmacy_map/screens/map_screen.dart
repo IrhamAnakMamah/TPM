@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -54,16 +55,16 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // Titik koordinat awal (Contoh: Area sekitar UPN Yogyakarta)
-  static const CameraPosition _initialPosition = CameraPosition(
-    target: LatLng(-7.761005, 110.409156),
-    zoom: 14.5,
-  );
-
-  GoogleMapController? _mapController;
+  // Map controller
+  final MapController _mapController = MapController();
+  
+  // User location
   Position? _currentPosition;
   bool _isLoading = true;
   String _searchQuery = '';
+
+  // Default location (UPN Yogyakarta)
+  static const LatLng _defaultLocation = LatLng(-7.761005, 110.409156);
 
   // Data Apotek (Area Yogyakarta)
   final List<Pharmacy> _allPharmacies = [
@@ -124,11 +125,11 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
-    _mapController?.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
-  // FASE 2.1: Get Current Location
+  // Get Current Location
   Future<void> _initializeLocation() async {
     setState(() => _isLoading = true);
 
@@ -150,10 +151,9 @@ class _MapScreenState extends State<MapScreen> {
         _updatePharmacyDistances();
 
         // Move camera to user location
-        _mapController?.animateCamera(
-          CameraUpdate.newLatLng(
-            LatLng(position.latitude, position.longitude),
-          ),
+        _mapController.move(
+          LatLng(position.latitude, position.longitude),
+          14.5,
         );
       } else {
         // Permission denied, use default location
@@ -183,13 +183,15 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // FASE 2.2: Calculate Distance
+  // Calculate Distance
   double _calculateDistance(double lat, double lng) {
     if (_currentPosition == null) {
       // Use default location (UPN Yogyakarta)
       return Geolocator.distanceBetween(
-        -7.761005, 110.409156,
-        lat, lng,
+        _defaultLocation.latitude,
+        _defaultLocation.longitude,
+        lat,
+        lng,
       ) / 1000; // Convert to km
     }
 
@@ -201,7 +203,7 @@ class _MapScreenState extends State<MapScreen> {
     ) / 1000; // Convert to km
   }
 
-  // FASE 2.3: Update Pharmacy Distances & Sort
+  // Update Pharmacy Distances & Sort
   void _updatePharmacyDistances() {
     for (var pharmacy in _allPharmacies) {
       pharmacy.distance = _calculateDistance(pharmacy.lat, pharmacy.lng);
@@ -214,7 +216,7 @@ class _MapScreenState extends State<MapScreen> {
     _filterPharmacies();
   }
 
-  // FASE 2.4: Filter Pharmacies by Search
+  // Filter Pharmacies by Search
   void _filterPharmacies() {
     setState(() {
       if (_searchQuery.isEmpty) {
@@ -227,21 +229,19 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // FASE 2.5: Go to My Location
+  // Go to My Location
   Future<void> _goToMyLocation() async {
     if (_currentPosition != null) {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          15.0,
-        ),
+      _mapController.move(
+        LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        15.0,
       );
     } else {
       await _initializeLocation();
     }
   }
 
-  // FASE 2.6: Open in Google Maps
+  // Open in Google Maps
   Future<void> _openInGoogleMaps(Pharmacy pharmacy) async {
     final url = Uri.parse(
       'https://www.google.com/maps/dir/?api=1'
@@ -278,39 +278,82 @@ class _MapScreenState extends State<MapScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Peta dibuat full screen menabrak status bar
       body: Stack(
         children: [
-          // 1. WIDGET GOOGLE MAPS
-          GoogleMap(
-            initialCameraPosition: _initialPosition,
-            zoomControlsEnabled: false,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            onMapCreated: (controller) {
-              _mapController = controller;
-              // Move to user location if available
-              if (_currentPosition != null) {
-                controller.animateCamera(
-                  CameraUpdate.newLatLng(
-                    LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                  ),
-                );
-              }
-            },
-            markers: _pharmacies.map((pharmacy) {
-              return Marker(
-                markerId: MarkerId(pharmacy.id),
-                position: LatLng(pharmacy.lat, pharmacy.lng),
-                infoWindow: InfoWindow(
-                  title: pharmacy.name,
-                  snippet: '${pharmacy.distance?.toStringAsFixed(1)} km • ${pharmacy.isOpen ? "Buka" : "Tutup"}',
-                ),
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  pharmacy.isOpen ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed,
-                ),
-              );
-            }).toSet(),
+          // 1. FLUTTER MAP (OpenStreetMap)
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentPosition != null
+                  ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+                  : _defaultLocation,
+              initialZoom: 14.5,
+              minZoom: 10.0,
+              maxZoom: 18.0,
+            ),
+            children: [
+              // Tile Layer (OpenStreetMap)
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.tugas_akhir_tpm',
+                maxZoom: 19,
+              ),
+              
+              // Marker Layer (Pharmacies)
+              MarkerLayer(
+                markers: [
+                  // User location marker (blue)
+                  if (_currentPosition != null)
+                    Marker(
+                      point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                      width: 40,
+                      height: 40,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.3),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.blue, width: 3),
+                        ),
+                        child: const Icon(Icons.person, color: Colors.blue, size: 20),
+                      ),
+                    ),
+                  
+                  // Pharmacy markers
+                  ..._pharmacies.map((pharmacy) {
+                    return Marker(
+                      point: LatLng(pharmacy.lat, pharmacy.lng),
+                      width: 40,
+                      height: 40,
+                      child: GestureDetector(
+                        onTap: () {
+                          // Zoom to pharmacy
+                          _mapController.move(
+                            LatLng(pharmacy.lat, pharmacy.lng),
+                            16.0,
+                          );
+                          
+                          // Show info
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${pharmacy.name}\n${pharmacy.distance?.toStringAsFixed(1)} km • ${pharmacy.isOpen ? "Buka" : "Tutup"}',
+                              ),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: pharmacy.isOpen ? Colors.green : Colors.red,
+                            ),
+                          );
+                        },
+                        child: Icon(
+                          Icons.local_pharmacy,
+                          color: pharmacy.isOpen ? Colors.green : Colors.red,
+                          size: 40,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ],
           ),
 
           // Loading overlay
@@ -404,11 +447,9 @@ class _MapScreenState extends State<MapScreen> {
                         final pharmacy = _pharmacies[index];
                         return GestureDetector(
                           onTap: () {
-                            _mapController?.animateCamera(
-                              CameraUpdate.newLatLngZoom(
-                                LatLng(pharmacy.lat, pharmacy.lng),
-                                16.0,
-                              ),
+                            _mapController.move(
+                              LatLng(pharmacy.lat, pharmacy.lng),
+                              16.0,
                             );
                           },
                           child: Container(
