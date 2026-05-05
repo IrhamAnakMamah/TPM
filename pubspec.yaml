@@ -23,6 +23,7 @@ dependencies:
   sensors_plus: ^4.0.0
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
+  local_auth: ^2.1.0  # Biometric authentication
 
 dev_dependencies:
   flutter_test:

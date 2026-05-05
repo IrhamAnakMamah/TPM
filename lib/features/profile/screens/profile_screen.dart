@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/session_manager.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/biometric_service.dart';
+import '../../../data/local/database_helper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,7 +14,13 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final SessionManager _session = SessionManager();
   final ApiService _apiService = ApiService();
+  final BiometricService _biometricService = BiometricService();
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+  
   bool _isNotificationEnabled = true;
+  bool _isBiometricEnabled = false;
+  bool _isBiometricAvailable = false;
+  String _biometricType = '';
 
   // Data dari session (live dari backend)
   String get _userName => _session.userName;
@@ -28,6 +36,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return parts[0][0].toUpperCase();
     }
     return '?';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricAvailability();
+    _loadBiometricStatus();
   }
 
   @override
@@ -118,6 +133,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     () => _toggleNotification()
                   ),
                   
+                  // FITUR AKTIF: BIOMETRIC LOGIN
+                  if (_isBiometricAvailable)
+                    _buildMenuTile(
+                      _isBiometricEnabled ? Icons.fingerprint : Icons.fingerprint_outlined,
+                      'Login Biometrik ($_biometricType)',
+                      Colors.green,
+                      () => _toggleBiometric(),
+                    ),
+                  
                   // FITUR AKTIF: EVALUASI (BOTTOM SHEET)
                   _buildMenuTile(Icons.feedback_outlined, 'Evaluasi & Masukan', Colors.purple, () => _showEvaluationSheet()),
                   
@@ -188,6 +212,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _toggleNotification() {
     setState(() => _isNotificationEnabled = !_isNotificationEnabled);
     _showSnackBar(_isNotificationEnabled ? 'Notifikasi Aktif' : 'Notifikasi Dimatikan');
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // BIOMETRIC METHODS
+  // ══════════════════════════════════════════════════════════════
+
+  Future<void> _checkBiometricAvailability() async {
+    final isAvailable = await _biometricService.isBiometricAvailable();
+    final biometricName = await _biometricService.getAvailableBiometricNames();
+    
+    setState(() {
+      _isBiometricAvailable = isAvailable;
+      _biometricType = biometricName;
+    });
+    
+    print('🔐 Biometric available: $isAvailable ($biometricName)');
+  }
+
+  Future<void> _loadBiometricStatus() async {
+    final userId = _session.userId;
+    if (userId == null) return;
+    
+    final isEnabled = await _dbHelper.isBiometricEnabled(userId);
+    setState(() {
+      _isBiometricEnabled = isEnabled;
+    });
+    
+    print('🔐 Biometric status loaded: $isEnabled');
+  }
+
+  Future<void> _toggleBiometric() async {
+    if (!_isBiometricAvailable) {
+      _showSnackBar('Biometrik tidak tersedia di device ini');
+      return;
+    }
+
+    final userId = _session.userId;
+    if (userId == null) {
+      _showSnackBar('User ID tidak ditemukan');
+      return;
+    }
+
+    if (_isBiometricEnabled) {
+      // Disable biometric - need authentication first
+      final authenticated = await _biometricService.authenticate(
+        localizedReason: 'Verifikasi untuk menonaktifkan login biometrik',
+      );
+      
+      if (authenticated) {
+        await _dbHelper.updateBiometricStatus(userId, false);
+        setState(() => _isBiometricEnabled = false);
+        _showSnackBar('Login biometrik dinonaktifkan');
+      }
+    } else {
+      // Enable biometric - need authentication first
+      final authenticated = await _biometricService.authenticate(
+        localizedReason: 'Verifikasi untuk mengaktifkan login biometrik',
+      );
+      
+      if (authenticated) {
+        await _dbHelper.updateBiometricStatus(userId, true);
+        setState(() => _isBiometricEnabled = true);
+        _showSnackBar('Login biometrik diaktifkan');
+      } else {
+        _showSnackBar('Autentikasi gagal');
+      }
+    }
   }
 
   void _showEvaluationSheet() {
