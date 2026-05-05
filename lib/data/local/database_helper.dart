@@ -695,21 +695,21 @@ class DatabaseHelper {
           // Hitung selisih waktu
           final difference = now.difference(scheduledTime);
           
-          // Logika status:
-          // - On-time: ±30 menit dari jadwal
-          // - Late: > 30 menit setelah jadwal, tapi masih hari yang sama
-          // - Missed: Tidak dikonfirmasi (ini dihandle di tempat lain)
+          // VALIDASI: Tidak boleh minum lebih dari 1 jam sebelum jadwal
+          if (difference.inMinutes < -60) {
+            throw Exception('Obat hanya bisa diminum maksimal 1 jam sebelum jadwal. Jadwal: $timeIntake, Sekarang: ${now.hour}:${now.minute.toString().padLeft(2, '0')}');
+          }
           
-          if (difference.inMinutes.abs() <= 30) {
+          // Logika status:
+          // - On-time: -60 menit sampai +30 menit dari jadwal
+          // - Late: > 30 menit setelah jadwal, tapi masih hari yang sama
+          
+          if (difference.inMinutes >= -60 && difference.inMinutes <= 30) {
             status = 'on-time';
             print('✅ Status: ON-TIME (difference: ${difference.inMinutes} minutes)');
           } else if (difference.inMinutes > 30) {
             status = 'late';
             print('⚠️ Status: LATE (difference: ${difference.inMinutes} minutes)');
-          } else {
-            // Konfirmasi sebelum jadwal (early)
-            status = 'on-time';
-            print('✅ Status: ON-TIME (early by ${difference.inMinutes.abs()} minutes)');
           }
         }
         

@@ -171,10 +171,21 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             _loadData();
           }
         } else {
+          // Error message dari database helper
+          final errorMsg = result['message'] as String;
+          
+          // Parse error untuk UI yang lebih friendly
+          String displayMsg = errorMsg;
+          if (errorMsg.contains('maksimal 1 jam sebelum jadwal')) {
+            // Extract jadwal time dari error message
+            displayMsg = '⏰ Terlalu awal! Obat hanya bisa diminum maksimal 1 jam sebelum jadwal.';
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✗ ${result['message']}'),
+              content: Text(displayMsg),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
