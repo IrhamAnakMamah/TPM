@@ -176,16 +176,34 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
           
           // Parse error untuk UI yang lebih friendly
           String displayMsg = errorMsg;
+          Color bgColor = Colors.red;
+          
           if (errorMsg.contains('maksimal 1 jam sebelum jadwal')) {
-            // Extract jadwal time dari error message
+            // Terlalu awal
             displayMsg = '⏰ Terlalu awal! Obat hanya bisa diminum maksimal 1 jam sebelum jadwal.';
+            bgColor = Colors.orange;
+          } else if (errorMsg.contains('Stok tidak cukup')) {
+            // Stok tidak cukup
+            displayMsg = errorMsg.replaceAll('Exception: ', '');
+            displayMsg = '📦 $displayMsg';
+            bgColor = Colors.red.shade700;
           }
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(displayMsg),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
+              backgroundColor: bgColor,
+              duration: const Duration(seconds: 5),
+              action: errorMsg.contains('Stok tidak cukup')
+                  ? SnackBarAction(
+                      label: 'Tambah Stok',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        // Navigate to add medication screen
+                        Navigator.pushNamed(context, '/add-schedule');
+                      },
+                    )
+                  : null,
             ),
           );
         }
@@ -268,6 +286,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
     final totalStock = _schedule!['total_stock'] as double;
     final notes = _schedule!['notes'] as String?;
     final isLowStock = totalStock < 5;
+    final isInsufficientStock = totalStock < dosage; // Stok tidak cukup untuk 1x minum
     
     return Container(
       padding: const EdgeInsets.all(20),
@@ -291,12 +310,24 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isLowStock ? Colors.orange.shade50 : Colors.blue.shade50,
+                  color: isInsufficientStock 
+                      ? Colors.red.shade50 
+                      : isLowStock 
+                          ? Colors.orange.shade50 
+                          : Colors.blue.shade50,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  isLowStock ? Icons.warning_amber_rounded : Icons.medication,
-                  color: isLowStock ? Colors.orange : Colors.blue,
+                  isInsufficientStock 
+                      ? Icons.error_outline 
+                      : isLowStock 
+                          ? Icons.warning_amber_rounded 
+                          : Icons.medication,
+                  color: isInsufficientStock 
+                      ? Colors.red 
+                      : isLowStock 
+                          ? Colors.orange 
+                          : Colors.blue,
                   size: 32,
                 ),
               ),
@@ -314,6 +345,35 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             ],
           ),
           
+          // Warning banner jika stok tidak cukup
+          if (isInsufficientStock) ...[
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Stok tidak cukup! Dibutuhkan ${dosage.toInt()} $dosageUnit, tersedia ${totalStock.toInt()} $dosageUnit.',
+                      style: TextStyle(
+                        color: Colors.red.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
           const SizedBox(height: 20),
           const Divider(),
           const SizedBox(height: 15),
@@ -327,7 +387,7 @@ class _MedicationDetailScreenState extends State<MedicationDetailScreen> {
             Icons.inventory_2_outlined,
             'Stok',
             '${totalStock.toInt()} $dosageUnit',
-            isWarning: isLowStock,
+            isWarning: isLowStock || isInsufficientStock,
           ),
           if (notes != null && notes.isNotEmpty) ...[
             const SizedBox(height: 12),

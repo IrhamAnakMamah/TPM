@@ -641,7 +641,7 @@ class DatabaseHelper {
         // 1. Ambil stok saat ini
         final medResult = await txn.query(
           'medications',
-          columns: ['total_stock'],
+          columns: ['total_stock', 'name', 'drug_type'],
           where: 'id = ?',
           whereArgs: [medId],
         );
@@ -651,9 +651,21 @@ class DatabaseHelper {
         }
         
         final currentStock = medResult.first['total_stock'] as double;
+        final medName = medResult.first['name'] as String;
+        final drugType = medResult.first['drug_type'] as String?;
+        
+        print('📊 Confirm Medication: currentStock=$currentStock, dosage=$dosage');
+        
+        // VALIDASI: Cek apakah stok cukup
+        if (currentStock < dosage) {
+          final unit = drugType?.toLowerCase() == 'tablet' ? 'tablet' : 
+                       drugType?.toLowerCase() == 'kapsul' ? 'kapsul' : 'unit';
+          throw Exception('Stok tidak cukup! Tersedia: ${currentStock.toInt()} $unit, Dibutuhkan: ${dosage.toInt()} $unit. Silakan tambah stok terlebih dahulu.');
+        }
+        
         final newStock = currentStock - dosage;
         
-        print('📊 Confirm Medication: currentStock=$currentStock, dosage=$dosage, newStock=$newStock');
+        print('📊 Stock calculation: $currentStock - $dosage = $newStock');
         
         // 2. Update stok
         await txn.update(
