@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Manajer sesi dengan persistensi menggunakan SharedPreferences
 /// untuk menyimpan JWT token dan data profil user yang sedang login.
 ///
 /// Session akan tetap tersimpan meskipun aplikasi ditutup.
+/// Credentials (username & password) disimpan secara encrypted di Secure Storage.
 class SessionManager {
   // Singleton
   SessionManager._internal();
@@ -15,6 +17,13 @@ class SessionManager {
   static const String _keyAccessToken = 'access_token';
   static const String _keyCurrentUser = 'current_user';
   static const String _keyLastUserId = 'last_user_id'; // User ID terakhir yang login (tidak di-clear saat logout)
+
+  // Secure Storage keys (untuk credentials)
+  static const String _keySecureUsername = 'secure_username';
+  static const String _keySecurePassword = 'secure_password';
+
+  // Secure Storage instance
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   // ── Data Sesi (in-memory cache) ───────────────
   String? _accessToken;
@@ -115,6 +124,47 @@ class SessionManager {
     } catch (e) {
       print('❌ Error getting last user ID: $e');
       return null;
+    }
+  }
+
+  // ── Save Credentials (untuk biometric login) ──
+  Future<void> saveCredentials(String username, String password) async {
+    try {
+      await _secureStorage.write(key: _keySecureUsername, value: username);
+      await _secureStorage.write(key: _keySecurePassword, value: password);
+      print('✅ Credentials saved to Secure Storage');
+    } catch (e) {
+      print('❌ Error saving credentials: $e');
+    }
+  }
+
+  // ── Get Saved Credentials ──
+  Future<Map<String, String>?> getSavedCredentials() async {
+    try {
+      final username = await _secureStorage.read(key: _keySecureUsername);
+      final password = await _secureStorage.read(key: _keySecurePassword);
+      
+      if (username != null && password != null) {
+        print('✅ Credentials loaded from Secure Storage');
+        return {'username': username, 'password': password};
+      }
+      
+      print('⚠️ No saved credentials found');
+      return null;
+    } catch (e) {
+      print('❌ Error loading credentials: $e');
+      return null;
+    }
+  }
+
+  // ── Delete Credentials ──
+  Future<void> deleteCredentials() async {
+    try {
+      await _secureStorage.delete(key: _keySecureUsername);
+      await _secureStorage.delete(key: _keySecurePassword);
+      print('✅ Credentials deleted from Secure Storage');
+    } catch (e) {
+      print('❌ Error deleting credentials: $e');
     }
   }
 }

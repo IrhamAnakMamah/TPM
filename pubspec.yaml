@@ -25,6 +25,7 @@ dependencies:
   latlong2: ^0.9.0
   local_auth: ^2.1.0  # Biometric authentication
   shared_preferences: ^2.2.0  # Persistent storage
+  flutter_secure_storage: ^9.0.0  # Secure storage for credentials
 
 dev_dependencies:
   flutter_test:

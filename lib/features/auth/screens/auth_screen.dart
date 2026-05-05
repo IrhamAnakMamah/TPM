@@ -80,27 +80,34 @@ class _AuthScreenState extends State<AuthScreen> {
 
     setState(() => _isLoading = true);
 
+    // Authenticate dengan biometric
     final authenticated = await _biometricService.authenticateForLogin();
     
     if (authenticated) {
       // Biometric authentication successful
-      // Jika session belum di-load, load dulu
-      if (_session.userId == null) {
-        await _session.loadSession();
-      }
+      // Load saved credentials
+      final credentials = await _session.getSavedCredentials();
       
-      // Jika masih null setelah load, berarti session sudah expired
-      // User harus login manual
-      if (_session.userId == null) {
+      if (credentials == null) {
         if (!mounted) return;
-        _showSnackBar('Session expired. Silakan login dengan username & password.', isError: true);
+        _showSnackBar('Credentials tidak ditemukan. Silakan login dengan username & password.', isError: true);
         setState(() => _isLoading = false);
         return;
       }
       
-      if (!mounted) return;
-      _showSnackBar('Login berhasil! Selamat datang ${_session.userName} 👋');
-      Navigator.pushReplacementNamed(context, '/home');
+      // Login dengan saved credentials
+      final result = await _apiService.login(
+        username: credentials['username']!,
+        password: credentials['password']!,
+      );
+      
+      if (result['success'] == true) {
+        if (!mounted) return;
+        _showSnackBar('Login berhasil! Selamat datang ${_session.userName} 👋');
+        Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        _showSnackBar(result['message'] ?? 'Login gagal', isError: true);
+      }
     } else {
       _showSnackBar('Autentikasi sidik jari gagal', isError: true);
     }
@@ -128,6 +135,9 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => _isLoading = false);
 
     if (result['success'] == true) {
+      // Save credentials untuk biometric login
+      await _session.saveCredentials(username, password);
+      
       if (!mounted) return;
       _showSnackBar('Login berhasil! Selamat datang 👋');
       Navigator.pushReplacementNamed(context, '/home');
