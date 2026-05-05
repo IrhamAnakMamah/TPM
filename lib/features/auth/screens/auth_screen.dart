@@ -44,9 +44,15 @@ class _AuthScreenState extends State<AuthScreen> {
     await _session.loadSession();
     
     // Check if there's a logged in user with biometric enabled
-    final userId = _session.userId;
+    // Gunakan last user ID jika session sudah di-clear (setelah logout)
+    int? userId = _session.userId;
+    if (userId == null) {
+      userId = await _session.getLastUserId();
+    }
+    
     if (userId == null) {
       setState(() => _showBiometricButton = false);
+      print('🔐 No user ID found, hiding biometric button');
       return;
     }
 
@@ -61,7 +67,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _handleBiometricLogin() async {
-    final userId = _session.userId;
+    // Gunakan last user ID jika session sudah di-clear
+    int? userId = _session.userId;
+    if (userId == null) {
+      userId = await _session.getLastUserId();
+    }
+    
     if (userId == null) {
       _showSnackBar('Tidak ada user yang tersimpan', isError: true);
       return;
@@ -73,8 +84,20 @@ class _AuthScreenState extends State<AuthScreen> {
     
     if (authenticated) {
       // Biometric authentication successful
-      // Session sudah di-load dari SharedPreferences di initState
-      // Tinggal navigate ke home
+      // Jika session belum di-load, load dulu
+      if (_session.userId == null) {
+        await _session.loadSession();
+      }
+      
+      // Jika masih null setelah load, berarti session sudah expired
+      // User harus login manual
+      if (_session.userId == null) {
+        if (!mounted) return;
+        _showSnackBar('Session expired. Silakan login dengan username & password.', isError: true);
+        setState(() => _isLoading = false);
+        return;
+      }
+      
       if (!mounted) return;
       _showSnackBar('Login berhasil! Selamat datang ${_session.userName} 👋');
       Navigator.pushReplacementNamed(context, '/home');

@@ -14,6 +14,7 @@ class SessionManager {
   // SharedPreferences keys
   static const String _keyAccessToken = 'access_token';
   static const String _keyCurrentUser = 'current_user';
+  static const String _keyLastUserId = 'last_user_id'; // User ID terakhir yang login (tidak di-clear saat logout)
 
   // ── Data Sesi (in-memory cache) ───────────────
   String? _accessToken;
@@ -42,6 +43,14 @@ class SessionManager {
     // Simpan ke SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyCurrentUser, jsonEncode(user));
+    
+    // Simpan last user ID (untuk biometric login)
+    final userId = user['id'];
+    if (userId != null) {
+      await prefs.setInt(_keyLastUserId, userId);
+      print('✅ Last user ID saved: $userId');
+    }
+    
     print('✅ User data saved to SharedPreferences');
   }
 
@@ -90,10 +99,22 @@ class SessionManager {
     _accessToken = null;
     _currentUser = null;
     
-    // Hapus dari SharedPreferences
+    // Hapus dari SharedPreferences (KECUALI last_user_id untuk biometric)
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyAccessToken);
     await prefs.remove(_keyCurrentUser);
-    print('✅ Session cleared from SharedPreferences');
+    // JANGAN hapus _keyLastUserId agar biometric login tetap bisa cek
+    print('✅ Session cleared from SharedPreferences (last_user_id retained)');
+  }
+
+  // ── Get Last User ID (untuk biometric login) ──
+  Future<int?> getLastUserId() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt(_keyLastUserId);
+    } catch (e) {
+      print('❌ Error getting last user ID: $e');
+      return null;
+    }
   }
 }
