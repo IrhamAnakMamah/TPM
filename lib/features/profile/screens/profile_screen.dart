@@ -220,15 +220,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ══════════════════════════════════════════════════════════════
 
   Future<void> _checkBiometricAvailability() async {
+    print('🔐 Checking biometric availability...');
+    
     final isAvailable = await _biometricService.isBiometricAvailable();
     final biometricName = await _biometricService.getAvailableBiometricNames();
+    
+    // Additional debug info
+    final canCheck = await _biometricService.canCheckBiometrics();
+    final isSupported = await _biometricService.isDeviceSupported();
+    final availableBiometrics = await _biometricService.getAvailableBiometrics();
+    
+    print('   → Can check biometrics: $canCheck');
+    print('   → Device supported: $isSupported');
+    print('   → Available biometrics: $availableBiometrics');
+    print('   → Biometric name: $biometricName');
+    print('   → Is available: $isAvailable');
     
     setState(() {
       _isBiometricAvailable = isAvailable;
       _biometricType = biometricName;
     });
     
-    print('🔐 Biometric available: $isAvailable ($biometricName)');
+    print('🔐 Biometric availability check complete');
+    print('   → Will show menu: $_isBiometricAvailable');
   }
 
   Future<void> _loadBiometricStatus() async {
@@ -244,6 +258,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _toggleBiometric() async {
+    print('🔐 Toggle biometric called');
+    print('   → Available: $_isBiometricAvailable');
+    print('   → Enabled: $_isBiometricEnabled');
+    
     if (!_isBiometricAvailable) {
       _showSnackBar('Biometrik tidak tersedia di device ini');
       return;
@@ -255,29 +273,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
+    print('   → User ID: $userId');
+
     if (_isBiometricEnabled) {
       // Disable biometric - need authentication first
+      print('🔐 Attempting to disable biometric...');
       final authenticated = await _biometricService.authenticate(
-        localizedReason: 'Verifikasi untuk menonaktifkan login biometrik',
+        localizedReason: 'Scan sidik jari untuk menonaktifkan login biometrik',
       );
+      
+      print('   → Authentication result: $authenticated');
       
       if (authenticated) {
         await _dbHelper.updateBiometricStatus(userId, false);
         setState(() => _isBiometricEnabled = false);
         _showSnackBar('Login biometrik dinonaktifkan');
+      } else {
+        _showSnackBar('Autentikasi gagal. Pastikan sidik jari Anda terdaftar di device.');
       }
     } else {
       // Enable biometric - need authentication first
+      print('🔐 Attempting to enable biometric...');
+      
+      // Double check biometric availability
+      final canCheck = await _biometricService.canCheckBiometrics();
+      final isSupported = await _biometricService.isDeviceSupported();
+      final availableBiometrics = await _biometricService.getAvailableBiometrics();
+      
+      print('   → Can check: $canCheck');
+      print('   → Is supported: $isSupported');
+      print('   → Available biometrics: $availableBiometrics');
+      
+      if (!canCheck || !isSupported || availableBiometrics.isEmpty) {
+        _showSnackBar('Sidik jari tidak tersedia. Pastikan Anda sudah setup sidik jari di Settings device.');
+        return;
+      }
+      
       final authenticated = await _biometricService.authenticate(
-        localizedReason: 'Verifikasi untuk mengaktifkan login biometrik',
+        localizedReason: 'Scan sidik jari untuk mengaktifkan login biometrik',
       );
+      
+      print('   → Authentication result: $authenticated');
       
       if (authenticated) {
         await _dbHelper.updateBiometricStatus(userId, true);
         setState(() => _isBiometricEnabled = true);
-        _showSnackBar('Login biometrik diaktifkan');
+        _showSnackBar('Login biometrik diaktifkan! ✅');
       } else {
-        _showSnackBar('Autentikasi gagal');
+        _showSnackBar('Autentikasi gagal. Pastikan sidik jari Anda terdaftar di device.');
       }
     }
   }

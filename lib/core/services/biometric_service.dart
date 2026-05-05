@@ -53,7 +53,14 @@ class BiometricService {
       final isSupported = await isDeviceSupported();
       final availableBiometrics = await getAvailableBiometrics();
       
-      return canCheck && isSupported && availableBiometrics.isNotEmpty;
+      // Filter: hanya fingerprint yang diperbolehkan (tidak face/iris)
+      final hasFingerprint = availableBiometrics.contains(BiometricType.fingerprint) ||
+                             availableBiometrics.contains(BiometricType.strong) ||
+                             availableBiometrics.contains(BiometricType.weak);
+      
+      print('🔐 Biometric check: canCheck=$canCheck, isSupported=$isSupported, hasFingerprint=$hasFingerprint');
+      
+      return canCheck && isSupported && hasFingerprint;
     } catch (e) {
       print('❌ Error checking biometric availability: $e');
       return false;
@@ -75,42 +82,52 @@ class BiometricService {
     bool stickyAuth = true,
   }) async {
     try {
+      print('🔐 Starting biometric authentication...');
+      print('   → Reason: $localizedReason');
+      
       // Check if biometric is available
       final isAvailable = await isBiometricAvailable();
+      print('   → Is available: $isAvailable');
+      
       if (!isAvailable) {
         print('⚠️ Biometric not available on this device');
         return false;
       }
 
       // Authenticate
+      print('   → Calling authenticate...');
       final authenticated = await _localAuth.authenticate(
         localizedReason: localizedReason,
-        options: AuthenticationOptions(
-          useErrorDialogs: useErrorDialogs,
-          stickyAuth: stickyAuth,
-          biometricOnly: false, // Allow PIN/Pattern as fallback
+        options: const AuthenticationOptions(
+          useErrorDialogs: true,
+          stickyAuth: true,
+          biometricOnly: true, // ONLY fingerprint, no PIN/Pattern fallback
         ),
       );
 
       if (authenticated) {
         print('✅ Biometric authentication successful');
       } else {
-        print('❌ Biometric authentication failed');
+        print('❌ Biometric authentication failed (user cancelled or failed)');
       }
 
       return authenticated;
-    } on Exception catch (e) {
-      print('❌ Error during authentication: $e');
+    } catch (e) {
+      print('❌ Exception during authentication: $e');
+      print('   → Type: ${e.runtimeType}');
       
       // Handle specific errors
-      if (e.toString().contains(auth_error.notAvailable)) {
+      final errorString = e.toString();
+      if (errorString.contains(auth_error.notAvailable)) {
         print('⚠️ Biometric not available');
-      } else if (e.toString().contains(auth_error.notEnrolled)) {
+      } else if (errorString.contains(auth_error.notEnrolled)) {
         print('⚠️ No biometric enrolled');
-      } else if (e.toString().contains(auth_error.lockedOut)) {
+      } else if (errorString.contains(auth_error.lockedOut)) {
         print('⚠️ Too many attempts, locked out');
-      } else if (e.toString().contains(auth_error.permanentlyLockedOut)) {
+      } else if (errorString.contains(auth_error.permanentlyLockedOut)) {
         print('⚠️ Permanently locked out');
+      } else if (errorString.contains('PlatformException')) {
+        print('⚠️ Platform exception: $errorString');
       }
       
       return false;
@@ -120,7 +137,7 @@ class BiometricService {
   /// Authenticate for login
   Future<bool> authenticateForLogin() async {
     return await authenticate(
-      localizedReason: 'Login dengan sidik jari atau wajah Anda',
+      localizedReason: 'Scan sidik jari Anda untuk login',
       useErrorDialogs: true,
       stickyAuth: true,
     );
@@ -129,7 +146,7 @@ class BiometricService {
   /// Authenticate for sensitive action
   Future<bool> authenticateForAction(String action) async {
     return await authenticate(
-      localizedReason: 'Verifikasi identitas untuk $action',
+      localizedReason: 'Scan sidik jari untuk $action',
       useErrorDialogs: true,
       stickyAuth: false,
     );
@@ -164,9 +181,19 @@ class BiometricService {
       return 'Tidak ada';
     }
     
-    return biometrics
-        .map((type) => getBiometricTypeName(type))
-        .join(', ');
+    // Filter: hanya tampilkan fingerprint
+    final fingerprintTypes = biometrics.where((type) => 
+      type == BiometricType.fingerprint ||
+      type == BiometricType.strong ||
+      type == BiometricType.weak
+    ).toList();
+    
+    if (fingerprintTypes.isEmpty) {
+      return 'Tidak ada';
+    }
+    
+    // Selalu return "Sidik Jari" untuk semua fingerprint types
+    return 'Sidik Jari';
   }
 
   /// Stop authentication (cancel)

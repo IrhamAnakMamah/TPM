@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: OutlinedButton.icon(
                             onPressed: _isLoading ? null : _handleBiometricLogin,
                             icon: const Icon(Icons.fingerprint, size: 28),
-                            label: const Text('Login dengan Biometrik', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            label: const Text('Login dengan Sidik Jari', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.teal.shade700,
                               side: BorderSide(color: Colors.teal.shade700, width: 2),
