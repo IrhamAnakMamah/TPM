@@ -39,12 +39,6 @@ class _AuthScreenState extends State<AuthScreen> {
     _checkBiometricLogin();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _checkBiometricLogin();
-  }
-
   Future<void> _checkBiometricLogin() async {
     // Load session first (in case app just started)
     await _session.loadSession();
