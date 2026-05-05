@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/biometric_service.dart';
+import '../../../core/services/session_manager.dart';
+import '../../../data/local/database_helper.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
 
@@ -14,8 +17,65 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final ApiService _apiService = ApiService();
+  final BiometricService _biometricService = BiometricService();
+  final SessionManager _session = SessionManager();
+  final DatabaseHelper _dbHelper = DatabaseHelper();
+  
   bool _isObscure = true;
   bool _isLoading = false;
+  bool _showBiometricButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometricLogin();
+  }
+
+  Future<void> _checkBiometricLogin() async {
+    // Load session first (in case app just started)
+    await _session.loadSession();
+    
+    // Check if there's a logged in user with biometric enabled
+    final userId = _session.userId;
+    if (userId == null) {
+      setState(() => _showBiometricButton = false);
+      return;
+    }
+
+    final isBiometricEnabled = await _dbHelper.isBiometricEnabled(userId);
+    final isBiometricAvailable = await _biometricService.isBiometricAvailable();
+    
+    setState(() {
+      _showBiometricButton = isBiometricEnabled && isBiometricAvailable;
+    });
+    
+    print('🔐 Biometric login available: $_showBiometricButton (userId: $userId, enabled: $isBiometricEnabled, available: $isBiometricAvailable)');
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    final userId = _session.userId;
+    if (userId == null) {
+      _showSnackBar('Tidak ada user yang tersimpan', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final authenticated = await _biometricService.authenticateForLogin();
+    
+    if (authenticated) {
+      // Biometric authentication successful
+      // Session sudah di-load dari SharedPreferences di initState
+      // Tinggal navigate ke home
+      if (!mounted) return;
+      _showSnackBar('Login berhasil! Selamat datang ${_session.userName} 👋');
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      _showSnackBar('Autentikasi biometrik gagal', isError: true);
+    }
+
+    setState(() => _isLoading = false);
+  }
 
   Future<void> _handleLogin() async {
     final username = _usernameController.text.trim();
@@ -121,6 +181,36 @@ class _LoginScreenState extends State<LoginScreen> {
                               : const Text('MASUK KE DASHBOARD', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                         ),
                       ),
+                      
+                      // --- BIOMETRIC LOGIN BUTTON ---
+                      if (_showBiometricButton) ...[
+                        const SizedBox(height: 15),
+                        const Row(
+                          children: [
+                            Expanded(child: Divider()),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text('atau', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            ),
+                            Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 15),
+                        SizedBox(
+                          width: double.infinity, height: 55,
+                          child: OutlinedButton.icon(
+                            onPressed: _isLoading ? null : _handleBiometricLogin,
+                            icon: const Icon(Icons.fingerprint, size: 28),
+                            label: const Text('Login dengan Sidik Jari', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.teal.shade700,
+                              side: BorderSide(color: Colors.teal.shade700, width: 2),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                            ),
+                          ),
+                        ),
+                      ],
+                      
                       const SizedBox(height: 20),
                       
                       // --- TOMBOL DAFTAR AKTIF ---

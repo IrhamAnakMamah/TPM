@@ -224,6 +224,31 @@ class DatabaseHelper {
     }
   }
 
+  /// Update biometric enabled status for user
+  Future<int> updateBiometricStatus(int userId, bool enabled) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'biometric_enabled': enabled ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  /// Get biometric enabled status for user
+  Future<bool> isBiometricEnabled(int userId) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      columns: ['biometric_enabled'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    
+    if (result.isEmpty) return false;
+    return (result.first['biometric_enabled'] as int) == 1;
+  }
+
   /// Tambah obat baru (dengan user_id dari session)
   Future<int> insertMedication({
     required int userId,

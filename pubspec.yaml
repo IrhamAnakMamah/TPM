@@ -24,6 +24,9 @@ dependencies:
   flutter_map: ^6.1.0
   latlong2: ^0.9.0
   fl_chart: ^0.66.0  # Charts for analytics
+  local_auth: ^2.1.0  # Biometric authentication
+  shared_preferences: ^2.2.0  # Persistent storage
+  flutter_secure_storage: ^9.0.0  # Secure storage for credentials
 
 dev_dependencies:
   flutter_test:
