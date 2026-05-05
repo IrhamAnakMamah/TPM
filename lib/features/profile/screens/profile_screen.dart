@@ -173,12 +173,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               // Update di session secara lokal (backend belum ada endpoint update profile)
               final currentUser = _session.currentUser ?? {};
               currentUser['full_name'] = nameCtrl.text;
-              _session.setUser(currentUser);
+              await _session.setUser(currentUser);
               setState(() {});
+              if (!mounted) return;
               Navigator.pop(context);
               _showSnackBar('Profil diperbarui!');
             },
@@ -311,9 +312,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           TextButton(
-            onPressed: () {
-              _apiService.logout(); // Bersihkan sesi
-              Navigator.pushReplacementNamed(context, '/');
+            onPressed: () async {
+              await _apiService.logout(); // Bersihkan sesi
+              if (!mounted) return;
+              Navigator.pushReplacementNamed(context, '/auth');
             },
             child: const Text('Keluar', style: TextStyle(color: Colors.red)),
           ),

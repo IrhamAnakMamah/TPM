@@ -32,6 +32,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _checkBiometricLogin() async {
+    // Load session first (in case app just started)
+    await _session.loadSession();
+    
     // Check if there's a logged in user with biometric enabled
     final userId = _session.userId;
     if (userId == null) {
@@ -45,6 +48,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _showBiometricButton = isBiometricEnabled && isBiometricAvailable;
     });
+    
+    print('🔐 Biometric login available: $_showBiometricButton (userId: $userId, enabled: $isBiometricEnabled, available: $isBiometricAvailable)');
   }
 
   Future<void> _handleBiometricLogin() async {
@@ -59,9 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final authenticated = await _biometricService.authenticateForLogin();
     
     if (authenticated) {
-      // Biometric authentication successful, navigate to home
+      // Biometric authentication successful
+      // Session sudah di-load dari SharedPreferences di initState
+      // Tinggal navigate ke home
       if (!mounted) return;
-      _showSnackBar('Login berhasil! Selamat datang 👋');
+      _showSnackBar('Login berhasil! Selamat datang ${_session.userName} 👋');
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       _showSnackBar('Autentikasi biometrik gagal', isError: true);
