@@ -665,17 +665,65 @@ class DatabaseHelper {
         
         print('✅ Stock updated to: ${newStock > 0 ? newStock : 0}');
         
-        // 3. Log konsumsi
+        // 3. Hitung status (on-time, late, atau missed)
+        final scheduleResult = await txn.query(
+          'schedules',
+          columns: ['time_intake'],
+          where: 'id = ?',
+          whereArgs: [scheduleId],
+        );
+        
+        String status = 'on-time'; // default
+        
+        if (scheduleResult.isNotEmpty) {
+          final timeIntake = scheduleResult.first['time_intake'] as String; // Format: "HH:mm"
+          final now = DateTime.now();
+          
+          // Parse scheduled time
+          final timeParts = timeIntake.split(':');
+          final scheduledHour = int.parse(timeParts[0]);
+          final scheduledMinute = int.parse(timeParts[1]);
+          
+          final scheduledTime = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            scheduledHour,
+            scheduledMinute,
+          );
+          
+          // Hitung selisih waktu
+          final difference = now.difference(scheduledTime);
+          
+          // Logika status:
+          // - On-time: ±30 menit dari jadwal
+          // - Late: > 30 menit setelah jadwal, tapi masih hari yang sama
+          // - Missed: Tidak dikonfirmasi (ini dihandle di tempat lain)
+          
+          if (difference.inMinutes.abs() <= 30) {
+            status = 'on-time';
+            print('✅ Status: ON-TIME (difference: ${difference.inMinutes} minutes)');
+          } else if (difference.inMinutes > 30) {
+            status = 'late';
+            print('⚠️ Status: LATE (difference: ${difference.inMinutes} minutes)');
+          } else {
+            // Konfirmasi sebelum jadwal (early)
+            status = 'on-time';
+            print('✅ Status: ON-TIME (early by ${difference.inMinutes.abs()} minutes)');
+          }
+        }
+        
+        // 4. Log konsumsi dengan status yang sudah dihitung
         await txn.insert('intake_logs', {
           'schedule_id': scheduleId,
           'timestamp': DateTime.now().toIso8601String(),
-          'status': 'on-time', // TODO: Hitung apakah late berdasarkan time_intake
+          'status': status,
           'note': null,
         });
         
-        print('✅ Intake log created');
+        print('✅ Intake log created with status: $status');
         
-        // 4. Jika stok habis atau kurang, set schedule jadi expired (JANGAN DELETE MEDICATION)
+        // 5. Jika stok habis atau kurang, set schedule jadi expired (JANGAN DELETE MEDICATION)
         if (newStock <= 0) {
           print('⚠️ Stock is 0 or less ($newStock), setting schedules to expired...');
           
